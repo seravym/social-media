@@ -24,3 +24,93 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* login */
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.login-page h1,
+.login-page p {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.login-button {
+  padding: 12px 20px;
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.login-label {
+  display: flex;
+  align-items: center;
+}
+
+.login-input {
+  background: transparent;
+  color: #ffffff;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+}
+
+.login-input::placeholder {
+  color: #8a8a8a;
+}
+
+/* signup */
+.signup-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 400px;
+  font-size: 1rem;
+}
+
+.signup-page h1,
+.signup-page p {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.signup-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  outline: none;
+}
+
+.signup-input::placeholder {
+  color: #8a8a8a;
+}
+
+.signup-button {
+  padding: 12px 20px;
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.signup-link {
+  text-decoration: underline;
+}
