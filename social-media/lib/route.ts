@@ -10,7 +10,7 @@ export function authed<C = unknown>(
 ) {
   return async (req: Request, ctx: C): Promise<Response> => {
     try {
-      const mockUser: MockUser = { id: "user_id_dummy" }; 
+      const mockUser: MockUser = { id: "cmw9dzn1h00004okr31yn29tn" }; 
       
       return await fn(mockUser, req, ctx);
     } catch (error) {
