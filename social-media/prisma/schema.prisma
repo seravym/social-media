@@ -12,3 +12,21 @@ model User {
   email String  @unique
   name  String?
 }
+
+model Community {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  image       String?
+  creatorId   Int
+  createdAt   DateTime @default(now())
+}
+
+model CommunityMember {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  communityId Int
+  joinedAt    DateTime @default(now())
+
+  @@unique([userId, communityId])
+}
