@@ -1,3 +1,4 @@
+
 datasource db {
   provider = "sqlite"
 }
@@ -9,48 +10,58 @@ generator client {
 
 // USER
 model User {
-  id    String     @id @default(cuid())
-  email String  @unique
-  name  String?
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  username  String   @unique
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  // NOTIFICATION
+  receivedNotifications Notification[] @relation("ReceivedNotifications")
+  sentNotifications     Notification[] @relation("SentNotifications")
+
+  // CHAT
+  conversations ConversationMember[]
+  messages      Message[]
+
+  // COMMUNITIES
+  createdCommunities   Community[]
+  communityMemberships CommunityMember[]
 }
 
-// COMMUNITIY
+// COMMUNITIES
 model Community {
   id          Int      @id @default(autoincrement())
   name        String   @unique
   description String?
   image       String?
-  creatorId   Int
+  creatorId   String
   createdAt   DateTime @default(now())
+
+  creator User @relation(fields: [creatorId], references: [id])
+  members CommunityMember[]
 }
 
-//COMMUNITYMEMBER
+// COMMUNITY MEMBERS
 model CommunityMember {
   id          Int      @id @default(autoincrement())
-  userId      Int
+  userId      String
   communityId Int
   joinedAt    DateTime @default(now())
 
-  @@unique([userId, communityId])
-  username  String @unique
-  avatarUrl   String?  
-  createdAt   DateTime @default(now())
-  
-  //notif
-  receivedNotifications Notification[] @relation("ReceivedNotifications")
-  sentNotifications     Notification[] @relation("SentNotifications")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
 
-  //chat
-  conversations         ConversationMember[]
-  messages              Message[]
+  @@unique([userId, communityId])
 }
 
-// NOTIF
+// NOTIFICATION
 model Notification {
   id        String   @id @default(cuid())
   userId    String
   actorId   String?
-  type      String   
+  type      String
   postId    String?
   message   String?
   isRead    Boolean  @default(false)
@@ -66,7 +77,7 @@ model Notification {
 // CHAT
 model Conversation {
   id        String   @id @default(cuid())
-  type      String   
+  type      String
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -78,7 +89,7 @@ model Conversation {
 model ConversationMember {
   conversationId String
   userId         String
-  status         String   @default("active") 
+  status         String   @default("active")
   lastReadAt     DateTime @default(now())
   joinedAt       DateTime @default(now())
 
