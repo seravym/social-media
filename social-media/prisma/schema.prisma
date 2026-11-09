@@ -1,4 +1,5 @@
 
+
 datasource db {
   provider = "sqlite"
 }
@@ -28,6 +29,12 @@ model User {
   // COMMUNITIES
   createdCommunities   Community[]
   communityMemberships CommunityMember[]
+
+  // articles
+  articles         Article[]        @relation("ArticleAuthor")
+  articleComments  ArticleComment[] @relation("ArticleCommentAuthor")
+  articleLikes     ArticleLike[]
+  articleBookmarks ArticleBookmark[]
 }
 
 // COMMUNITIES
@@ -112,3 +119,68 @@ model Message {
 
   @@index([conversationId, createdAt])
 }
+
+// ARTICLES
+
+model Article {
+  id            String   @id @default(cuid())
+  authorId      String
+  title         String
+  content       String
+  coverImageUrl String?
+  status        String   @default("published")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  publishedAt   DateTime?
+
+  author        User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  comments      ArticleComment[]
+  likes         ArticleLike[]
+  bookmarks     ArticleBookmark[]
+
+  @@index([authorId, createdAt])
+  @@index([status, publishedAt])
+}
+
+model ArticleComment {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt])
+  @@index([userId])
+}
+
+model ArticleLike {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
+  @@index([userId])
+}
+
+model ArticleBookmark {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
+  @@index([userId, createdAt])
+}
+
+
