@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { NotificationBadge } from "@/components/NotificationBadge";
 
 interface Post {
   id: string;
@@ -41,13 +42,17 @@ const STORE_ALL_POSTS = "xclone.posts.list";
 
 export default function HomePage() {
   const router = useRouter();
-  const [currentTab, setCurrentTab] = useState<"foryou" | "following">("foryou");
+  const [currentTab, setCurrentTab] = useState<"foryou" | "following">(
+    "foryou",
+  );
   const [postText, setPostText] = useState("");
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
 
   const [posts, setPosts] = useState<Post[]>(() => {
     if (typeof window === "undefined") return defaultPosts;
-    const localPosts = JSON.parse(localStorage.getItem(STORE_ALL_POSTS) || "null");
+    const localPosts = JSON.parse(
+      localStorage.getItem(STORE_ALL_POSTS) || "null",
+    );
     if (localPosts && localPosts.length > 0) {
       return localPosts;
     }
@@ -89,8 +94,17 @@ export default function HomePage() {
       {/* Navigasi Sederhana */}
       <nav>
         <ul>
-          <li><a href="/home">Home</a></li>
-          <li><a href="/communities">Communities</a></li>
+          <li>
+            <a href="/home">Home</a>
+          </li>
+          <li>
+            <a href="/communities">Communities</a>
+          </li>
+          <li>
+            <a href="/notifications">
+              Notifications <NotificationBadge className="translate-y-[-1px]" />
+            </a>
+          </li>
         </ul>
       </nav>
 
@@ -139,7 +153,12 @@ export default function HomePage() {
               <div
                 key={postId}
                 onClick={() => router.push(`/post/${postId}`)}
-                style={{ border: "1px solid gray", margin: "10px 0", padding: "10px", cursor: "pointer" }}
+                style={{
+                  border: "1px solid gray",
+                  margin: "10px 0",
+                  padding: "10px",
+                  cursor: "pointer",
+                }}
               >
                 <p>
                   <strong>{post.name}</strong> {post.handle} - {post.time}
@@ -149,8 +168,8 @@ export default function HomePage() {
                   <span>💬 {post.replies || 0}</span> |{" "}
                   <button onClick={(e) => handleToggleLike(e, postId)}>
                     {isLiked ? "❤️ Suka" : "🤍 Suka"} ({displayLikes})
-                  </button> |{" "}
-                  <span>📊 {post.views || 0}</span>
+                  </button>{" "}
+                  | <span>📊 {post.views || 0}</span>
                 </div>
               </div>
             );

@@ -5,11 +5,12 @@ import type { NotificationDto } from "@/lib/types";
 
 export const GET = authed(async (user, req) => {
   const tab = new URL(req.url).searchParams.get("tab");
-  
+
   const rows = await prisma.notification.findMany({
     where: { 
       userId: user.id, 
-      ...(tab === "mentions" ? { type: "mention" } : {}) 
+      ...(tab === "mentions" ? { type: "mention" } : {}),
+      ...(tab === "unread" ? { isRead: false } : {})
     },
     include: { actor: { select: userCardSelect } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],

@@ -20,7 +20,7 @@ async function main() {
     data: {
       userId: user.id,
       type: "follow",
-      message: "Ini testing",
+      message: "",
       isRead: false,
     }
   });
