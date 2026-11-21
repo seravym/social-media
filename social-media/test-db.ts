@@ -8,6 +8,7 @@ async function main() {
     data: {
       email: 'budi@example.com',
       name: 'inibudi',
+      username: 'budi',
     },
   })
   console.log('Berhasil membuat user:', newUser)

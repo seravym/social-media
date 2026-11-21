@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NotificationDto } from "@/lib/types";
 
@@ -24,7 +24,7 @@ function timeAgo(iso: string) {
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
+const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
   return new Date(iso).toLocaleDateString();
 }
@@ -55,32 +55,37 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (currentTab: Tab) => {
-    try {
-      const res = await fetch(`/api/notifications?tab=${currentTab}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Failed to load notifications");
-      const data = await res.json();
-      setItems(data.items ?? []);
-      setUnreadCount(data.unreadCount ?? 0);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    load(tab);
-  }, [tab, load]);
+    const controller = new AbortController();
+
+    fetch(`/api/notifications?tab=${tab}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load notifications");
+        return res.json();
+      })
+      .then((data) => {
+        setItems(data.items ?? []);
+        setUnreadCount(data.unreadCount ?? 0);
+        setError(null);
+      })
+      .catch((e) => {
+        if (controller.signal.aborted) return;
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [tab]);
 
   const handleTabChange = (next: Tab) => {
     if (next === tab) return;
     setLoading(true);
     setTab(next);
-    load(next);
   };
 
   const handleMarkRead = async (id: string) => {

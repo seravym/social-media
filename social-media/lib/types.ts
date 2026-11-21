@@ -13,3 +13,24 @@ export interface NotificationDto {
   isRead: boolean;
   createdAt: string;
 }
+
+export interface ChatMessageDto {
+  id: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ConversationDto {
+  id: string;
+  other: UserCard | null;
+  lastMessage: ChatMessageDto | null;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ConversationDetailDto {
+  id: string;
+  other: UserCard | null;
+  messages: ChatMessageDto[];
+}
