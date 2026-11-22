@@ -1,5 +1,4 @@
 
-
 datasource db {
   provider = "postgresql"
 }
@@ -30,11 +29,18 @@ model User {
   createdCommunities   Community[]
   communityMemberships CommunityMember[]
 
-  // articles
+  // LISTS
+  createdLists    List[]       @relation("ListOwner")
+  listMemberships ListMember[]
+
+  // ARTICLES
   articles         Article[]        @relation("ArticleAuthor")
   articleComments  ArticleComment[] @relation("ArticleCommentAuthor")
   articleLikes     ArticleLike[]
   articleBookmarks ArticleBookmark[]
+
+  // BOOKMARK
+  bookmarks Bookmark[]
 }
 
 // COMMUNITIES
@@ -61,6 +67,37 @@ model CommunityMember {
   community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
 
   @@unique([userId, communityId])
+}
+
+// LISTS
+model List {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  isPrivate   Boolean  @default(false)
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner   User         @relation("ListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members ListMember[]
+
+  @@index([ownerId, createdAt])
+  @@index([isPrivate, createdAt])
+}
+
+// LIST MEMBERS
+model ListMember {
+  id        Int      @id @default(autoincrement())
+  listId    Int
+  userId    String
+  addedAt   DateTime @default(now())
+
+  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, userId])
+  @@index([userId])
 }
 
 // NOTIFICATION
@@ -121,7 +158,6 @@ model Message {
 }
 
 // ARTICLES
-
 model Article {
   id            String   @id @default(cuid())
   authorId      String
@@ -133,10 +169,10 @@ model Article {
   updatedAt     DateTime @updatedAt
   publishedAt   DateTime?
 
-  author        User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  comments      ArticleComment[]
-  likes         ArticleLike[]
-  bookmarks     ArticleBookmark[]
+  author    User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  comments  ArticleComment[]
+  likes     ArticleLike[]
+  bookmarks ArticleBookmark[]
 
   @@index([authorId, createdAt])
   @@index([status, publishedAt])
@@ -184,3 +220,14 @@ model ArticleBookmark {
 }
 
 
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId, createdAt])
+}
