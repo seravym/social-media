@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import "./communities.css";
 
 type Community = {
   id: number;
@@ -19,6 +20,12 @@ export default function CommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+  const [communityName, setCommunityName] = useState("");
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     async function fetchCommunities() {
@@ -43,84 +50,199 @@ export default function CommunitiesPage() {
     community.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  function handleCreateCommunity(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (!communityName.trim()) {
+      setFormError("Community name cannot be empty.");
+      return;
+    }
+
+    if (communityName.trim().length < 3) {
+      setFormError("Community name must be at least 3 characters.");
+      return;
+    }
+
+    setFormError("");
+
+    alert("Form is valid! API connection will be added later.");
+
+    setShowModal(false);
+    setCommunityName("");
+    setDescription("");
+    setImage("");
+  }
+
+  function closeModal() {
+    setShowModal(false);
+    setFormError("");
+  }
+
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-gray-900">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-semibold text-pink-600">
-            EXPLORE YOUR INTERESTS
-          </p>
+    <div className="communities-page">
+      <div className="communities-container">
 
-          <h1 className="text-3xl font-bold">
-            Communities
-          </h1>
+        {/* Header */}
+        <div className="communities-header">
+          <div>
+            <p className="communities-subtitle">
+              EXPLORE YOUR INTERESTS
+            </p>
 
-          <p className="mt-2 text-gray-500">
-            Find people who share your interests and join their communities.
-          </p>
+            <h1>Communities</h1>
+
+            <p className="communities-description">
+              Find people who share your interests and join their communities.
+            </p>
+          </div>
+
+          <button
+            className="create-community-btn"
+            onClick={() => setShowModal(true)}
+          >
+            + Create Community
+          </button>
         </div>
 
-        <div className="mb-6">
+        {/* Search */}
+        <div className="community-search">
           <input
             type="text"
             placeholder="Search communities..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
           />
         </div>
 
+        {/* Community List */}
         {loading ? (
-          <p className="py-10 text-center text-gray-500">
+          <p className="community-loading">
             Loading communities...
           </p>
         ) : filteredCommunities.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
-            <div className="mb-3 text-4xl">🌸</div>
+          <div className="community-empty">
+            <div className="empty-icon">🌸</div>
 
-            <h2 className="text-lg font-semibold">
+            <h2>
               {search ? "No communities found" : "No communities yet"}
             </h2>
 
-            <p className="mt-2 text-sm text-gray-500">
+            <p>
               {search
                 ? "Try searching with another keyword."
                 : "Be the first to create a community!"}
             </p>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="community-grid">
             {filteredCommunities.map((community) => (
-              <div
-                key={community.id}
-                className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="flex h-32 items-center justify-center bg-gradient-to-r from-pink-100 to-purple-100">
+              <div className="community-card" key={community.id}>
+                <div className="community-image">
                   {community.image ? (
-                    <img src={community.image} alt={community.name} className="h-full w-full object-cover"/>
+                    <img
+                      src={community.image}
+                      alt={community.name}
+                    />
                   ) : (
-                    <span className="text-5xl">🌷</span>
+                    <span>🌷</span>
                   )}
                 </div>
 
-                <div className="p-5">
-                  <h2 className="text-lg font-bold">
-                    {community.name}
-                  </h2>
+                <div className="community-card-content">
+                  <h2>{community.name}</h2>
 
-                  <p className="mt-2 line-clamp-3 min-h-12 text-sm text-gray-500">
+                  <p>
                     {community.description || "No description available."}
                   </p>
 
-                  <p className="mt-4 text-xs text-gray-400">
+                  <span className="community-members">
                     {community._count?.members ?? 0} members
-                  </p>
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         )}
+
       </div>
+
+      {/* Create Community Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div
+            className="create-community-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Create Community</h2>
+
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={closeModal}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCommunity}>
+              <div className="form-group">
+                <label>Community Name *</label>
+
+                <input
+                  type="text"
+                  placeholder="Enter community name"
+                  value={communityName}
+                  onChange={(e) => setCommunityName(e.target.value)}
+                  maxLength={50}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Description</label>
+
+                <textarea
+                  placeholder="What is your community about?"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  maxLength={300}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Image URL</label>
+
+                <input
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={image}
+                  onChange={(e) => setImage(e.target.value)}
+                />
+              </div>
+
+              {formError && (
+                <p className="form-error">{formError}</p>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button type="submit" className="submit-btn">
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
