@@ -41,10 +41,8 @@ export default function ListsPage() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Mengambil Discover Lists dan Your Lists dari database
   const fetchLists = useCallback(async () => {
     try {
-      // Memastikan proses asynchronous dimulai sebelum mengubah state
       await Promise.resolve();
 
       if (!TEST_USER_ID) {
@@ -70,9 +68,7 @@ export default function ListsPage() {
       }
 
       if (!myResponse.ok || !myResult.success) {
-        throw new Error(
-          myResult.message || "Failed to fetch Your Lists."
-        );
+        throw new Error(myResult.message || "Failed to fetch Your Lists.");
       }
 
       setDiscoverLists(discoverResult.data);
@@ -89,11 +85,10 @@ export default function ListsPage() {
   }, []);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  void fetchLists();
-}, [fetchLists]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchLists();
+  }, [fetchLists]);
 
-  // Filter Discover Lists
   const filteredDiscoverLists = useMemo(() => {
     return discoverLists.filter((list) => {
       const keyword = search.toLowerCase();
@@ -105,7 +100,6 @@ export default function ListsPage() {
     });
   }, [discoverLists, search]);
 
-  // Filter Your Lists
   const filteredMyLists = useMemo(() => {
     return myLists.filter((list) => {
       const keyword = search.toLowerCase();
@@ -117,7 +111,6 @@ export default function ListsPage() {
     });
   }, [myLists, search]);
 
-  // Membuka modal Create
   function openCreateModal() {
     setEditingListId(null);
     setListName("");
@@ -127,7 +120,6 @@ export default function ListsPage() {
     setShowModal(true);
   }
 
-  // Membuka modal Edit
   function openEditModal(list: List) {
     setEditingListId(list.id);
     setListName(list.name);
@@ -138,7 +130,13 @@ export default function ListsPage() {
     setShowModal(true);
   }
 
-  // Menutup modal
+  function openManageMembers() {
+    if (editingListId === null) return;
+
+    setShowModal(false);
+    router.push(`/lists/${editingListId}/members`);
+  }
+
   function closeModal() {
     if (saving) return;
 
@@ -150,7 +148,6 @@ export default function ListsPage() {
     setFormError("");
   }
 
-  // Menyimpan Create atau Edit ke database
   async function handleSaveList() {
     const trimmedName = listName.trim();
 
@@ -215,7 +212,6 @@ export default function ListsPage() {
     }
   }
 
-  // Menghapus List dari database
   async function handleDeleteList(listId: number) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this list?"
@@ -252,7 +248,6 @@ export default function ListsPage() {
     }
   }
 
-  // Membuka halaman detail
   function openListDetail(listId: number) {
     router.push(`/lists/${listId}`);
   }
@@ -303,7 +298,6 @@ export default function ListsPage() {
           </div>
         )}
 
-        {/* Discover Lists */}
         {activeTab === "discover" && !pageError && (
           <section className="lists-content">
             {loading ? (
@@ -348,7 +342,6 @@ export default function ListsPage() {
           </section>
         )}
 
-        {/* Your Lists */}
         {activeTab === "my" && !pageError && (
           <section className="lists-content">
             {loading ? (
@@ -436,7 +429,6 @@ export default function ListsPage() {
         )}
       </div>
 
-      {/* Create / Edit Modal */}
       {showModal && (
         <div className="list-modal-overlay" onClick={closeModal}>
           <div
@@ -482,6 +474,16 @@ export default function ListsPage() {
               </label>
 
               {formError && <p className="list-form-error">{formError}</p>}
+
+              {editingListId !== null && (
+                <button
+                  type="button"
+                  className="manage-members-btn"
+                  onClick={openManageMembers}
+                >
+                  👥 Manage Members
+                </button>
+              )}
 
               <div className="list-modal-actions">
                 <button
