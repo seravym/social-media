@@ -17,7 +17,7 @@ export const GET = authed(async (user, req, ctx: { params: Promise<{ id: string 
     where: { id },
     include: {
       members: { include: { user: { select: userCardSelect } } },
-      messages: { orderBy: { createdAt: "asc" }, take: 200 },
+      messages: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
   if (!conv) {
@@ -26,15 +26,10 @@ export const GET = authed(async (user, req, ctx: { params: Promise<{ id: string 
 
   const otherMember = conv.members.find((x) => x.userId !== user.id);
 
-  await prisma.conversationMember.update({
-    where: { conversationId_userId: { conversationId: id, userId: user.id } },
-    data: { lastReadAt: new Date() },
-  });
-
   const dto: ConversationDetailDto = {
     id: conv.id,
     other: otherMember ? toUserCard(otherMember.user) : null,
-    messages: conv.messages.map((msg) => ({
+    messages: conv.messages.slice().reverse().map((msg) => ({
       id: msg.id,
       senderId: msg.senderId,
       body: msg.body,
