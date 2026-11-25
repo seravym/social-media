@@ -1,400 +1,206 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
-import "./lists.css";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import "./list-detail.css";
 
-type List = {
+type User = {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string | null;
+};
+
+type ListMember = {
+  id: number;
+  userId: string;
+  addedAt: string;
+  user: User;
+};
+
+type ListDetail = {
   id: number;
   name: string;
   description: string | null;
   isPrivate: boolean;
   ownerId: string;
   createdAt: string;
-  _count?: {
+  updatedAt: string;
+  owner: User;
+  members: ListMember[];
+  _count: {
     members: number;
   };
 };
 
-export default function ListsPage() {
-  const [discoverLists, setDiscoverLists] = useState<List[]>([]);
-  const [myLists, setMyLists] = useState<List[]>([]);
+export default function ListDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+
+  const [list, setList] = useState<ListDetail | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("discover");
-
-  const [showModal, setShowModal] = useState(false);
-  const [editingListId, setEditingListId] = useState<number | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-
-  const [listName, setListName] = useState("");
-  const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    async function fetchLists() {
+    async function fetchListDetail() {
       try {
-        const response = await fetch("/api/lists/discover");
+        const response = await fetch(`/api/lists/${id}`);
         const result = await response.json();
 
-        if (response.ok && result.success) {
-          setDiscoverLists(result.data);
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Failed to load list");
         }
-      } catch (error) {
-        console.error("Failed to fetch lists:", error);
+
+        setList(result.data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Something went wrong"
+        );
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLists();
-  }, []);
-
-  const filteredDiscoverLists = discoverLists.filter((list) =>
-    list.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredMyLists = myLists.filter((list) =>
-    list.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  function openCreateModal() {
-    setEditingListId(null);
-    setListName("");
-    setDescription("");
-    setIsPrivate(false);
-    setFormError("");
-    setShowModal(true);
-  }
-
-  function openEditModal(list: List) {
-    setEditingListId(list.id);
-    setListName(list.name);
-    setDescription(list.description || "");
-    setIsPrivate(list.isPrivate);
-    setFormError("");
-    setOpenMenuId(null);
-    setShowModal(true);
-  }
-
-  function handleSaveList(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    if (!listName.trim()) {
-      setFormError("List name cannot be empty.");
-      return;
+    if (id) {
+      fetchListDetail();
     }
+  }, [id]);
 
-    if (listName.trim().length < 3) {
-      setFormError("List name must be at least 3 characters.");
-      return;
-    }
-
-    if (editingListId !== null) {
-      setMyLists((previousLists) =>
-        previousLists.map((list) =>
-          list.id === editingListId
-            ? {
-                ...list,
-                name: listName.trim(),
-                description: description.trim() || null,
-                isPrivate,
-              }
-            : list
-        )
-      );
-    } else {
-      const newList: List = {
-        id: Date.now(),
-        name: listName.trim(),
-        description: description.trim() || null,
-        isPrivate,
-        ownerId: "local-preview",
-        createdAt: new Date().toISOString(),
-        _count: {
-          members: 0,
-        },
-      };
-
-      setMyLists((previousLists) => [newList, ...previousLists]);
-      setActiveTab("mine");
-      setSearch("");
-    }
-
-    closeModal();
-  }
-
-  function handleDeleteList(list: List) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${list.name}"?`
+  if (loading) {
+    return (
+      <div className="list-detail-page">
+        <p className="list-detail-loading">Loading list...</p>
+      </div>
     );
-
-    if (!confirmed) return;
-
-    setMyLists((previousLists) =>
-      previousLists.filter((item) => item.id !== list.id)
-    );
-
-    setOpenMenuId(null);
   }
 
-  function closeModal() {
-    setShowModal(false);
-    setEditingListId(null);
-    setListName("");
-    setDescription("");
-    setIsPrivate(false);
-    setFormError("");
+  if (error || !list) {
+    return (
+      <div className="list-detail-page">
+        <button
+          className="detail-back-btn"
+          onClick={() => router.push("/lists")}
+        >
+          ← Back to Lists
+        </button>
+
+        <div className="detail-empty">
+          <h2>List not found</h2>
+          <p>{error || "This list may have been deleted."}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="lists-page">
-      <div className="lists-container">
-
-        {/* Header */}
-        <div className="lists-header">
-          <div>
-            <p className="lists-subtitle">ORGANIZE YOUR INTERESTS</p>
-            <h1>Lists</h1>
-            <p className="lists-description">
-              Discover and create lists to organize your favorite accounts.
-            </p>
-          </div>
-
-          <button
-            className="create-list-btn"
-            onClick={openCreateModal}
-          >
-            + Create List
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="lists-search">
-          <input
-            type="text"
-            placeholder="Search lists..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        {/* Tabs */}
-        <div className="lists-tabs">
-          <button
-            className={activeTab === "discover" ? "active" : ""}
-            onClick={() => setActiveTab("discover")}
-          >
-            Discover new Lists
-          </button>
-
-          <button
-            className={activeTab === "mine" ? "active" : ""}
-            onClick={() => setActiveTab("mine")}
-          >
-            Your Lists
-          </button>
-        </div>
-
-        {/* Discover Lists */}
-        {activeTab === "discover" && (
-          <section className="lists-section">
-            {loading ? (
-              <p className="lists-loading">Loading lists...</p>
-            ) : filteredDiscoverLists.length === 0 ? (
-              <div className="lists-empty">
-                <div className="lists-empty-icon">📋</div>
-                <h2>No lists found</h2>
-                <p>
-                  {search
-                    ? "Try searching with another keyword."
-                    : "Public lists created by other users will appear here."}
-                </p>
-              </div>
-            ) : (
-              <div className="lists-grid">
-                {filteredDiscoverLists.map((list) => (
-                  <div className="list-card" key={list.id}>
-                    <div className="list-card-icon">📑</div>
-
-                    <div className="list-card-content">
-                      <h2>{list.name}</h2>
-                      <p>
-                        {list.description || "No description available."}
-                      </p>
-                      <span>
-                        {list._count?.members ?? 0} members
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Your Lists */}
-        {activeTab === "mine" && (
-          <section className="lists-section">
-            {filteredMyLists.length === 0 ? (
-              <div className="lists-empty">
-                <div className="lists-empty-icon">🗂️</div>
-                <h2>You havent created any lists yet</h2>
-                <p>
-                  Create your first list to organize your favorite accounts.
-                </p>
-
-                <button
-                  className="empty-create-btn"
-                  onClick={openCreateModal}
-                >
-                  Create your first List
-                </button>
-              </div>
-            ) : (
-              <div className="lists-grid">
-                {filteredMyLists.map((list) => (
-                  <div className="list-card" key={list.id}>
-                    <div className="list-card-icon">📑</div>
-
-                    <div className="list-card-content">
-                      <div className="list-card-title">
-                        <h2>{list.name}</h2>
-
-                        <div className="list-menu-wrapper">
-                          <button
-                            type="button"
-                            className="list-menu-btn"
-                            aria-label="List options"
-                            onClick={() =>
-                              setOpenMenuId(
-                                openMenuId === list.id ? null : list.id
-                              )
-                            }
-                          >
-                            ⋯
-                          </button>
-
-                          {openMenuId === list.id && (
-                            <div className="list-dropdown">
-                              <button
-                                type="button"
-                                onClick={() => openEditModal(list)}
-                              >
-                                ✏️ Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                className="delete-option"
-                                onClick={() => handleDeleteList(list)}
-                              >
-                                🗑️ Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <p>
-                        {list.description || "No description available."}
-                      </p>
-
-                      <span>
-                        {list.isPrivate ? "🔒 Private" : "🌐 Public"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-      </div>
-
-      {/* Create / Edit Modal */}
-      {showModal && (
-        <div
-          className="list-modal-overlay"
-          onClick={closeModal}
+    <div className="list-detail-page">
+      <header className="list-detail-header">
+        <button
+          className="detail-back-btn"
+          onClick={() => router.push("/lists")}
         >
-          <div
-            className="create-list-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="list-modal-header">
-              <h2>
-                {editingListId !== null ? "Edit List" : "Create a List"}
-              </h2>
+          ← Back
+        </button>
 
-              <button
-                type="button"
-                className="list-modal-close"
-                onClick={closeModal}
-              >
-                &times;
-              </button>
-            </div>
+        <h1>List Details</h1>
+      </header>
 
-            <form onSubmit={handleSaveList}>
-              <div className="list-form-group">
-                <label>List Name *</label>
-                <input
-                  type="text"
-                  placeholder="Enter list name"
-                  value={listName}
-                  onChange={(e) => {
-                    setListName(e.target.value);
-                    setFormError("");
-                  }}
-                  maxLength={50}
-                />
-              </div>
+      <section className="list-detail-card">
+        <div className="detail-title-row">
+          <div>
+            <span className="detail-label">
+              {list.isPrivate ? "🔒 Private List" : "🌐 Public List"}
+            </span>
 
-              <div className="list-form-group">
-                <label>Description</label>
-                <textarea
-                  placeholder="Describe your list..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  maxLength={300}
-                />
-              </div>
-
-              <label className="list-privacy">
-                <input
-                  type="checkbox"
-                  checked={isPrivate}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
-                />
-                <span>Make this list private</span>
-              </label>
-
-              {formError && (
-                <p className="list-form-error">{formError}</p>
-              )}
-
-              <div className="list-modal-actions">
-                <button
-                  type="button"
-                  className="list-cancel-btn"
-                  onClick={closeModal}
-                >
-                  Cancel
-                </button>
-
-                <button type="submit" className="list-submit-btn">
-                  {editingListId !== null ? "Save Changes" : "Create"}
-                </button>
-              </div>
-            </form>
+            <h2>{list.name}</h2>
           </div>
         </div>
-      )}
 
+        <p className="detail-description">
+          {list.description || "No description available."}
+        </p>
+
+        <div className="detail-owner">
+          <div className="detail-avatar">
+            {list.owner.avatarUrl ? (
+              <img src={list.owner.avatarUrl} alt={list.owner.name} />
+            ) : (
+              <span>
+                {list.owner.name?.charAt(0).toUpperCase() || "U"}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <strong>{list.owner.name}</strong>
+            <p>@{list.owner.username}</p>
+          </div>
+        </div>
+
+        <div className="detail-stats">
+          <div>
+            <strong>{list._count.members}</strong>
+            <span>Members</span>
+          </div>
+
+          <div>
+            <strong>
+              {new Date(list.createdAt).toLocaleDateString("id-ID")}
+            </strong>
+            <span>Created</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="list-members-section">
+        <div className="members-heading">
+          <h2>Members</h2>
+          <span>{list._count.members} members</span>
+        </div>
+
+        {list.members.length === 0 ? (
+          <div className="members-empty">
+            <div className="members-empty-icon">👥</div>
+            <h3>No members yet</h3>
+            <p>Members added to this list will appear here.</p>
+          </div>
+        ) : (
+          <div className="members-list">
+            {list.members.map((member) => (
+              <div className="member-item" key={member.id}>
+                <div className="member-avatar">
+                  {member.user.avatarUrl ? (
+                    <img
+                      src={member.user.avatarUrl}
+                      alt={member.user.name}
+                    />
+                  ) : (
+                    <span>
+                      {member.user.name?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="member-info">
+                  <strong>{member.user.name}</strong>
+                  <span>@{member.user.username}</span>
+                </div>
+
+                {member.userId === list.ownerId && (
+                  <span className="owner-badge">Owner</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="detail-footer">
+        <Link href="/lists">Back to Your Lists</Link>
+      </div>
     </div>
   );
 }
