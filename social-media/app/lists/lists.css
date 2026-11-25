@@ -1022,3 +1022,22 @@
     padding: 18px;
   }
 }
+
+
+.manage-members-btn {
+  width: 100%;
+  padding: 13px 16px;
+  margin-top: 8px;
+  background: #fff0f7;
+  color: #e91e8c;
+  border: 1px solid #f5c5df;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.manage-members-btn:hover {
+  background: #fce0ef;
+}
