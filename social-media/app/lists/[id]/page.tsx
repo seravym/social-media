@@ -1,8 +1,8 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import "./list-detail.css";
 
 type User = {
@@ -33,7 +33,7 @@ type ListDetail = {
   };
 };
 
-export default function ListDetailPage() {
+function ListDetailContent() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -62,7 +62,9 @@ export default function ListDetailPage() {
       }
     }
 
-    if (id) fetchList();
+    if (id) {
+      fetchList();
+    }
   }, [id]);
 
   if (loading) {
@@ -142,5 +144,19 @@ export default function ListDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ListDetail() {
+  return (
+    <Suspense
+      fallback={
+        <div className="list-detail-page">
+          <p>Loading list...</p>
+        </div>
+      }
+    >
+      <ListDetailContent />
+    </Suspense>
   );
 }
