@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import "./lists.css";
 
@@ -17,12 +18,16 @@ type List = {
   };
 };
 
+const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID;
+
 export default function ListsPage() {
   const router = useRouter();
 
   const [discoverLists, setDiscoverLists] = useState<List[]>([]);
   const [myLists, setMyLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pageError, setPageError] = useState("");
 
   const [activeTab, setActiveTab] = useState<"discover" | "my">("discover");
   const [search, setSearch] = useState("");
@@ -36,29 +41,59 @@ export default function ListsPage() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Mengambil public lists dari API
-  useEffect(() => {
-    async function fetchDiscoverLists() {
-      try {
-        const response = await fetch("/api/lists/discover");
-        const result = await response.json();
+  // Mengambil Discover Lists dan Your Lists dari database
+  const fetchLists = useCallback(async () => {
+    try {
+      // Memastikan proses asynchronous dimulai sebelum mengubah state
+      await Promise.resolve();
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to fetch lists");
-        }
-
-        setDiscoverLists(result.data);
-      } catch (error) {
-        console.error("Fetch Discover Lists Error:", error);
-      } finally {
-        setLoading(false);
+      if (!TEST_USER_ID) {
+        throw new Error("Test User ID belum diatur di file .env.local.");
       }
-    }
 
-    fetchDiscoverLists();
+      const [discoverResponse, myResponse] = await Promise.all([
+        fetch(
+          `/api/lists/discover?userId=${encodeURIComponent(TEST_USER_ID)}`
+        ),
+        fetch(`/api/lists/my?userId=${encodeURIComponent(TEST_USER_ID)}`),
+      ]);
+
+      const [discoverResult, myResult] = await Promise.all([
+        discoverResponse.json(),
+        myResponse.json(),
+      ]);
+
+      if (!discoverResponse.ok || !discoverResult.success) {
+        throw new Error(
+          discoverResult.message || "Failed to fetch Discover Lists."
+        );
+      }
+
+      if (!myResponse.ok || !myResult.success) {
+        throw new Error(
+          myResult.message || "Failed to fetch Your Lists."
+        );
+      }
+
+      setDiscoverLists(discoverResult.data);
+      setMyLists(myResult.data);
+      setPageError("");
+    } catch (error) {
+      console.error("Fetch Lists Error:", error);
+      setPageError(
+        error instanceof Error ? error.message : "Failed to load lists."
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Filter berdasarkan pencarian
+  useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void fetchLists();
+}, [fetchLists]);
+
+  // Filter Discover Lists
   const filteredDiscoverLists = useMemo(() => {
     return discoverLists.filter((list) => {
       const keyword = search.toLowerCase();
@@ -70,6 +105,7 @@ export default function ListsPage() {
     });
   }, [discoverLists, search]);
 
+  // Filter Your Lists
   const filteredMyLists = useMemo(() => {
     return myLists.filter((list) => {
       const keyword = search.toLowerCase();
@@ -104,6 +140,8 @@ export default function ListsPage() {
 
   // Menutup modal
   function closeModal() {
+    if (saving) return;
+
     setShowModal(false);
     setEditingListId(null);
     setListName("");
@@ -112,8 +150,8 @@ export default function ListsPage() {
     setFormError("");
   }
 
-  // Menyimpan Create atau Edit
-  function handleSaveList() {
+  // Menyimpan Create atau Edit ke database
+  async function handleSaveList() {
     const trimmedName = listName.trim();
 
     if (!trimmedName) {
@@ -126,52 +164,92 @@ export default function ListsPage() {
       return;
     }
 
-    if (editingListId !== null) {
-      setMyLists((previousLists) =>
-        previousLists.map((list) =>
-          list.id === editingListId
-            ? {
-                ...list,
-                name: trimmedName,
-                description: description.trim() || null,
-                isPrivate,
-              }
-            : list
-        )
-      );
-    } else {
-      const newList: List = {
-        id: Date.now(),
-        name: trimmedName,
-        description: description.trim() || null,
-        isPrivate,
-        ownerId: "local-preview",
-        createdAt: new Date().toISOString(),
-        _count: {
-          members: 0,
-        },
-      };
-
-      setMyLists((previousLists) => [newList, ...previousLists]);
-      setActiveTab("my");
+    if (!TEST_USER_ID) {
+      setFormError("Test User ID belum tersedia.");
+      return;
     }
 
-    closeModal();
+    setSaving(true);
+    setFormError("");
+
+    try {
+      const isEditing = editingListId !== null;
+
+      const response = await fetch(
+        isEditing ? `/api/lists/${editingListId}` : "/api/lists",
+        {
+          method: isEditing ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: trimmedName,
+            description: description.trim() || null,
+            isPrivate,
+            ownerId: TEST_USER_ID,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to save list.");
+      }
+
+      setShowModal(false);
+      setEditingListId(null);
+      setListName("");
+      setDescription("");
+      setIsPrivate(false);
+      setActiveTab("my");
+
+      await fetchLists();
+    } catch (error) {
+      console.error("Save List Error:", error);
+      setFormError(
+        error instanceof Error ? error.message : "Failed to save list."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
-  // Menghapus List
-  function handleDeleteList(listId: number) {
+  // Menghapus List dari database
+  async function handleDeleteList(listId: number) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this list?"
     );
 
     if (!confirmed) return;
 
-    setMyLists((previousLists) =>
-      previousLists.filter((list) => list.id !== listId)
-    );
+    if (!TEST_USER_ID) {
+      alert("Test User ID belum tersedia.");
+      return;
+    }
 
-    setOpenMenuId(null);
+    try {
+      const response = await fetch(
+        `/api/lists/${listId}?ownerId=${encodeURIComponent(TEST_USER_ID)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to delete list.");
+      }
+
+      setOpenMenuId(null);
+      await fetchLists();
+    } catch (error) {
+      console.error("Delete List Error:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to delete list."
+      );
+    }
   }
 
   // Membuka halaman detail
@@ -188,10 +266,7 @@ export default function ListsPage() {
             <p>Discover and organize your favorite people.</p>
           </div>
 
-          <button
-            className="create-list-btn"
-            onClick={openCreateModal}
-          >
+          <button className="create-list-btn" onClick={openCreateModal}>
             + Create List
           </button>
         </div>
@@ -222,8 +297,14 @@ export default function ListsPage() {
           </button>
         </div>
 
+        {pageError && (
+          <div className="lists-empty">
+            <p>{pageError}</p>
+          </div>
+        )}
+
         {/* Discover Lists */}
-        {activeTab === "discover" && (
+        {activeTab === "discover" && !pageError && (
           <section className="lists-content">
             {loading ? (
               <div className="lists-empty">
@@ -257,12 +338,8 @@ export default function ListsPage() {
                     </p>
 
                     <div className="list-card-footer">
-                      <span>
-                        👥 {list._count?.members ?? 0} members
-                      </span>
-                      <span className="view-list-link">
-                        View List →
-                      </span>
+                      <span>👥 {list._count?.members ?? 0} members</span>
+                      <span className="view-list-link">View List →</span>
                     </div>
                   </div>
                 ))}
@@ -272,12 +349,16 @@ export default function ListsPage() {
         )}
 
         {/* Your Lists */}
-        {activeTab === "my" && (
+        {activeTab === "my" && !pageError && (
           <section className="lists-content">
-            {filteredMyLists.length === 0 ? (
+            {loading ? (
+              <div className="lists-empty">
+                <p>Loading your lists...</p>
+              </div>
+            ) : filteredMyLists.length === 0 ? (
               <div className="lists-empty">
                 <div className="lists-empty-icon">📋</div>
-                <h3>You havent created any Lists yet</h3>
+                <h3>You have not created any Lists yet</h3>
                 <p>
                   Create your first List to organize your favorite people.
                 </p>
@@ -324,9 +405,7 @@ export default function ListsPage() {
                             className="list-dropdown"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <button
-                              onClick={() => openEditModal(list)}
-                            >
+                            <button onClick={() => openEditModal(list)}>
                               ✏️ Edit
                             </button>
 
@@ -346,12 +425,8 @@ export default function ListsPage() {
                     </p>
 
                     <div className="list-card-footer">
-                      <span>
-                        👥 {list._count?.members ?? 0} members
-                      </span>
-                      <span className="view-list-link">
-                        View List →
-                      </span>
+                      <span>👥 {list._count?.members ?? 0} members</span>
+                      <span className="view-list-link">View List →</span>
                     </div>
                   </div>
                 ))}
@@ -363,10 +438,7 @@ export default function ListsPage() {
 
       {/* Create / Edit Modal */}
       {showModal && (
-        <div
-          className="list-modal-overlay"
-          onClick={closeModal}
-        >
+        <div className="list-modal-overlay" onClick={closeModal}>
           <div
             className="list-modal"
             onClick={(event) => event.stopPropagation()}
@@ -376,10 +448,7 @@ export default function ListsPage() {
                 {editingListId !== null ? "Edit List" : "Create a List"}
               </h2>
 
-              <button
-                className="list-modal-close"
-                onClick={closeModal}
-              >
+              <button className="list-modal-close" onClick={closeModal}>
                 ×
               </button>
             </div>
@@ -412,14 +481,13 @@ export default function ListsPage() {
                 Make this List private
               </label>
 
-              {formError && (
-                <p className="list-form-error">{formError}</p>
-              )}
+              {formError && <p className="list-form-error">{formError}</p>}
 
               <div className="list-modal-actions">
                 <button
                   className="cancel-list-btn"
                   onClick={closeModal}
+                  disabled={saving}
                 >
                   Cancel
                 </button>
@@ -427,8 +495,13 @@ export default function ListsPage() {
                 <button
                   className="save-list-btn"
                   onClick={handleSaveList}
+                  disabled={saving}
                 >
-                  {editingListId !== null ? "Save Changes" : "Create List"}
+                  {saving
+                    ? "Saving..."
+                    : editingListId !== null
+                      ? "Save Changes"
+                      : "Create List"}
                 </button>
               </div>
             </div>
