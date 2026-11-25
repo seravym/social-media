@@ -24,12 +24,14 @@ export default function ListsPage() {
   const [activeTab, setActiveTab] = useState("discover");
 
   const [showModal, setShowModal] = useState(false);
+  const [editingListId, setEditingListId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
   const [listName, setListName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Fetch public lists
   useEffect(() => {
     async function fetchLists() {
       try {
@@ -49,7 +51,6 @@ export default function ListsPage() {
     fetchLists();
   }, []);
 
-  // Search lists
   const filteredDiscoverLists = discoverLists.filter((list) =>
     list.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -58,8 +59,26 @@ export default function ListsPage() {
     list.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Validate create list form
-  function handleCreateList(e: React.FormEvent<HTMLFormElement>) {
+  function openCreateModal() {
+    setEditingListId(null);
+    setListName("");
+    setDescription("");
+    setIsPrivate(false);
+    setFormError("");
+    setShowModal(true);
+  }
+
+  function openEditModal(list: List) {
+    setEditingListId(list.id);
+    setListName(list.name);
+    setDescription(list.description || "");
+    setIsPrivate(list.isPrivate);
+    setFormError("");
+    setOpenMenuId(null);
+    setShowModal(true);
+  }
+
+  function handleSaveList(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!listName.trim()) {
@@ -72,18 +91,60 @@ export default function ListsPage() {
       return;
     }
 
-    setFormError("");
+    if (editingListId !== null) {
+      setMyLists((previousLists) =>
+        previousLists.map((list) =>
+          list.id === editingListId
+            ? {
+                ...list,
+                name: listName.trim(),
+                description: description.trim() || null,
+                isPrivate,
+              }
+            : list
+        )
+      );
+    } else {
+      const newList: List = {
+        id: Date.now(),
+        name: listName.trim(),
+        description: description.trim() || null,
+        isPrivate,
+        ownerId: "local-preview",
+        createdAt: new Date().toISOString(),
+        _count: {
+          members: 0,
+        },
+      };
 
-    alert("Form is valid! API connection will be added after login is ready.");
+      setMyLists((previousLists) => [newList, ...previousLists]);
+      setActiveTab("mine");
+      setSearch("");
+    }
 
-    setShowModal(false);
-    setListName("");
-    setDescription("");
-    setIsPrivate(false);
+    closeModal();
+  }
+
+  function handleDeleteList(list: List) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${list.name}"?`
+    );
+
+    if (!confirmed) return;
+
+    setMyLists((previousLists) =>
+      previousLists.filter((item) => item.id !== list.id)
+    );
+
+    setOpenMenuId(null);
   }
 
   function closeModal() {
     setShowModal(false);
+    setEditingListId(null);
+    setListName("");
+    setDescription("");
+    setIsPrivate(false);
     setFormError("");
   }
 
@@ -103,7 +164,7 @@ export default function ListsPage() {
 
           <button
             className="create-list-btn"
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
           >
             + Create List
           </button>
@@ -162,7 +223,6 @@ export default function ListsPage() {
                       <p>
                         {list.description || "No description available."}
                       </p>
-
                       <span>
                         {list._count?.members ?? 0} members
                       </span>
@@ -187,7 +247,7 @@ export default function ListsPage() {
 
                 <button
                   className="empty-create-btn"
-                  onClick={() => setShowModal(true)}
+                  onClick={openCreateModal}
                 >
                   Create your first List
                 </button>
@@ -199,13 +259,50 @@ export default function ListsPage() {
                     <div className="list-card-icon">📑</div>
 
                     <div className="list-card-content">
-                      <h2>{list.name}</h2>
+                      <div className="list-card-title">
+                        <h2>{list.name}</h2>
+
+                        <div className="list-menu-wrapper">
+                          <button
+                            type="button"
+                            className="list-menu-btn"
+                            aria-label="List options"
+                            onClick={() =>
+                              setOpenMenuId(
+                                openMenuId === list.id ? null : list.id
+                              )
+                            }
+                          >
+                            ⋯
+                          </button>
+
+                          {openMenuId === list.id && (
+                            <div className="list-dropdown">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(list)}
+                              >
+                                ✏️ Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                className="delete-option"
+                                onClick={() => handleDeleteList(list)}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <p>
                         {list.description || "No description available."}
                       </p>
 
                       <span>
-                        {list.isPrivate ? "Private" : "Public"}
+                        {list.isPrivate ? "🔒 Private" : "🌐 Public"}
                       </span>
                     </div>
                   </div>
@@ -217,15 +314,20 @@ export default function ListsPage() {
 
       </div>
 
-      {/* Create List Modal */}
+      {/* Create / Edit Modal */}
       {showModal && (
-        <div className="list-modal-overlay" onClick={closeModal}>
+        <div
+          className="list-modal-overlay"
+          onClick={closeModal}
+        >
           <div
             className="create-list-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="list-modal-header">
-              <h2>Create a List</h2>
+              <h2>
+                {editingListId !== null ? "Edit List" : "Create a List"}
+              </h2>
 
               <button
                 type="button"
@@ -236,14 +338,17 @@ export default function ListsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateList}>
+            <form onSubmit={handleSaveList}>
               <div className="list-form-group">
                 <label>List Name *</label>
                 <input
                   type="text"
                   placeholder="Enter list name"
                   value={listName}
-                  onChange={(e) => setListName(e.target.value)}
+                  onChange={(e) => {
+                    setListName(e.target.value);
+                    setFormError("");
+                  }}
                   maxLength={50}
                 />
               </div>
@@ -282,7 +387,7 @@ export default function ListsPage() {
                 </button>
 
                 <button type="submit" className="list-submit-btn">
-                  Create
+                  {editingListId !== null ? "Save Changes" : "Create"}
                 </button>
               </div>
             </form>
