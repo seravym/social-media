@@ -16,20 +16,23 @@ export const GET = authed(async (user) => {
     },
   });
 
-  const items: ConversationDto[] = [];
-  for (const m of memberships) {
+  const unreadCounts = await Promise.all(
+    memberships.map((m) =>
+      prisma.message.count({
+        where: {
+          conversationId: m.conversationId,
+          senderId: { not: user.id },
+          createdAt: { gt: m.lastReadAt },
+        },
+      })
+    )
+  );
+
+  const items: ConversationDto[] = memberships.map((m, index) => {
     const otherMember = m.conversation.members.find((x) => x.userId !== user.id);
     const lastMsg = m.conversation.messages[0];
 
-    const unreadCount = await prisma.message.count({
-      where: {
-        conversationId: m.conversationId,
-        senderId: { not: user.id },
-        createdAt: { gt: m.lastReadAt },
-      },
-    });
-
-    items.push({
+    return {
       id: m.conversationId,
       other: otherMember ? toUserCard(otherMember.user) : null,
       lastMessage: lastMsg
@@ -40,10 +43,10 @@ export const GET = authed(async (user) => {
             createdAt: lastMsg.createdAt.toISOString(),
           }
         : null,
-      unreadCount,
+      unreadCount: unreadCounts[index],
       updatedAt: m.conversation.updatedAt.toISOString(),
-    });
-  }
+    };
+  });
 
   items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
@@ -68,8 +71,11 @@ export const POST = authed(async (user, req) => {
     where: { userId: user.id },
     include: { conversation: { include: { members: true } } },
   });
-  const existing = mine.find((m) =>
-    m.conversation.members.some((x) => x.userId === body.userId),
+  const existing = mine.find(
+    (m) =>
+      m.conversation.type === "direct" &&
+      m.conversation.members.length === 2 &&
+      m.conversation.members.some((x) => x.userId === body.userId),
   );
   if (existing) {
     return json({ conversationId: existing.conversationId, existing: true });
