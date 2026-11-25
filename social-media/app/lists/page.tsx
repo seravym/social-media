@@ -1,206 +1,440 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import "./list-detail.css";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import "./lists.css";
 
-type User = {
-  id: string;
-  name: string;
-  username: string;
-  avatarUrl: string | null;
-};
-
-type ListMember = {
-  id: number;
-  userId: string;
-  addedAt: string;
-  user: User;
-};
-
-type ListDetail = {
+type List = {
   id: number;
   name: string;
   description: string | null;
   isPrivate: boolean;
   ownerId: string;
   createdAt: string;
-  updatedAt: string;
-  owner: User;
-  members: ListMember[];
-  _count: {
+  updatedAt?: string;
+  _count?: {
     members: number;
   };
 };
 
-export default function ListDetailPage() {
-  const params = useParams();
+export default function ListsPage() {
   const router = useRouter();
-  const id = params.id as string;
 
-  const [list, setList] = useState<ListDetail | null>(null);
+  const [discoverLists, setDiscoverLists] = useState<List[]>([]);
+  const [myLists, setMyLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"discover" | "my">("discover");
+  const [search, setSearch] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingListId, setEditingListId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  const [listName, setListName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Mengambil public lists dari API
   useEffect(() => {
-    async function fetchListDetail() {
+    async function fetchDiscoverLists() {
       try {
-        const response = await fetch(`/api/lists/${id}`);
+        const response = await fetch("/api/lists/discover");
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load list");
+          throw new Error(result.message || "Failed to fetch lists");
         }
 
-        setList(result.data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Something went wrong"
-        );
+        setDiscoverLists(result.data);
+      } catch (error) {
+        console.error("Fetch Discover Lists Error:", error);
       } finally {
         setLoading(false);
       }
     }
 
-    if (id) {
-      fetchListDetail();
-    }
-  }, [id]);
+    fetchDiscoverLists();
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="list-detail-page">
-        <p className="list-detail-loading">Loading list...</p>
-      </div>
-    );
+  // Filter berdasarkan pencarian
+  const filteredDiscoverLists = useMemo(() => {
+    return discoverLists.filter((list) => {
+      const keyword = search.toLowerCase();
+
+      return (
+        list.name.toLowerCase().includes(keyword) ||
+        (list.description || "").toLowerCase().includes(keyword)
+      );
+    });
+  }, [discoverLists, search]);
+
+  const filteredMyLists = useMemo(() => {
+    return myLists.filter((list) => {
+      const keyword = search.toLowerCase();
+
+      return (
+        list.name.toLowerCase().includes(keyword) ||
+        (list.description || "").toLowerCase().includes(keyword)
+      );
+    });
+  }, [myLists, search]);
+
+  // Membuka modal Create
+  function openCreateModal() {
+    setEditingListId(null);
+    setListName("");
+    setDescription("");
+    setIsPrivate(false);
+    setFormError("");
+    setShowModal(true);
   }
 
-  if (error || !list) {
-    return (
-      <div className="list-detail-page">
-        <button
-          className="detail-back-btn"
-          onClick={() => router.push("/lists")}
-        >
-          ← Back to Lists
-        </button>
+  // Membuka modal Edit
+  function openEditModal(list: List) {
+    setEditingListId(list.id);
+    setListName(list.name);
+    setDescription(list.description || "");
+    setIsPrivate(list.isPrivate);
+    setFormError("");
+    setOpenMenuId(null);
+    setShowModal(true);
+  }
 
-        <div className="detail-empty">
-          <h2>List not found</h2>
-          <p>{error || "This list may have been deleted."}</p>
-        </div>
-      </div>
+  // Menutup modal
+  function closeModal() {
+    setShowModal(false);
+    setEditingListId(null);
+    setListName("");
+    setDescription("");
+    setIsPrivate(false);
+    setFormError("");
+  }
+
+  // Menyimpan Create atau Edit
+  function handleSaveList() {
+    const trimmedName = listName.trim();
+
+    if (!trimmedName) {
+      setFormError("List name is required.");
+      return;
+    }
+
+    if (trimmedName.length < 3) {
+      setFormError("List name must be at least 3 characters.");
+      return;
+    }
+
+    if (editingListId !== null) {
+      setMyLists((previousLists) =>
+        previousLists.map((list) =>
+          list.id === editingListId
+            ? {
+                ...list,
+                name: trimmedName,
+                description: description.trim() || null,
+                isPrivate,
+              }
+            : list
+        )
+      );
+    } else {
+      const newList: List = {
+        id: Date.now(),
+        name: trimmedName,
+        description: description.trim() || null,
+        isPrivate,
+        ownerId: "local-preview",
+        createdAt: new Date().toISOString(),
+        _count: {
+          members: 0,
+        },
+      };
+
+      setMyLists((previousLists) => [newList, ...previousLists]);
+      setActiveTab("my");
+    }
+
+    closeModal();
+  }
+
+  // Menghapus List
+  function handleDeleteList(listId: number) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this list?"
     );
+
+    if (!confirmed) return;
+
+    setMyLists((previousLists) =>
+      previousLists.filter((list) => list.id !== listId)
+    );
+
+    setOpenMenuId(null);
+  }
+
+  // Membuka halaman detail
+  function openListDetail(listId: number) {
+    router.push(`/lists/${listId}`);
   }
 
   return (
-    <div className="list-detail-page">
-      <header className="list-detail-header">
-        <button
-          className="detail-back-btn"
-          onClick={() => router.push("/lists")}
-        >
-          ← Back
-        </button>
-
-        <h1>List Details</h1>
-      </header>
-
-      <section className="list-detail-card">
-        <div className="detail-title-row">
+    <div className="lists-page">
+      <div className="lists-container">
+        <div className="lists-header">
           <div>
-            <span className="detail-label">
-              {list.isPrivate ? "🔒 Private List" : "🌐 Public List"}
-            </span>
-
-            <h2>{list.name}</h2>
+            <h1>Lists</h1>
+            <p>Discover and organize your favorite people.</p>
           </div>
+
+          <button
+            className="create-list-btn"
+            onClick={openCreateModal}
+          >
+            + Create List
+          </button>
         </div>
 
-        <p className="detail-description">
-          {list.description || "No description available."}
-        </p>
-
-        <div className="detail-owner">
-          <div className="detail-avatar">
-            {list.owner.avatarUrl ? (
-              <img src={list.owner.avatarUrl} alt={list.owner.name} />
-            ) : (
-              <span>
-                {list.owner.name?.charAt(0).toUpperCase() || "U"}
-              </span>
-            )}
-          </div>
-
-          <div>
-            <strong>{list.owner.name}</strong>
-            <p>@{list.owner.username}</p>
-          </div>
+        <div className="lists-search">
+          <span>⌕</span>
+          <input
+            type="text"
+            placeholder="Search Lists..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </div>
 
-        <div className="detail-stats">
-          <div>
-            <strong>{list._count.members}</strong>
-            <span>Members</span>
-          </div>
+        <div className="lists-tabs">
+          <button
+            className={activeTab === "discover" ? "active" : ""}
+            onClick={() => setActiveTab("discover")}
+          >
+            Discover new Lists
+          </button>
 
-          <div>
-            <strong>
-              {new Date(list.createdAt).toLocaleDateString("id-ID")}
-            </strong>
-            <span>Created</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="list-members-section">
-        <div className="members-heading">
-          <h2>Members</h2>
-          <span>{list._count.members} members</span>
+          <button
+            className={activeTab === "my" ? "active" : ""}
+            onClick={() => setActiveTab("my")}
+          >
+            Your Lists
+          </button>
         </div>
 
-        {list.members.length === 0 ? (
-          <div className="members-empty">
-            <div className="members-empty-icon">👥</div>
-            <h3>No members yet</h3>
-            <p>Members added to this list will appear here.</p>
-          </div>
-        ) : (
-          <div className="members-list">
-            {list.members.map((member) => (
-              <div className="member-item" key={member.id}>
-                <div className="member-avatar">
-                  {member.user.avatarUrl ? (
-                    <img
-                      src={member.user.avatarUrl}
-                      alt={member.user.name}
-                    />
-                  ) : (
-                    <span>
-                      {member.user.name?.charAt(0).toUpperCase() || "U"}
-                    </span>
-                  )}
-                </div>
-
-                <div className="member-info">
-                  <strong>{member.user.name}</strong>
-                  <span>@{member.user.username}</span>
-                </div>
-
-                {member.userId === list.ownerId && (
-                  <span className="owner-badge">Owner</span>
-                )}
+        {/* Discover Lists */}
+        {activeTab === "discover" && (
+          <section className="lists-content">
+            {loading ? (
+              <div className="lists-empty">
+                <p>Loading lists...</p>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            ) : filteredDiscoverLists.length === 0 ? (
+              <div className="lists-empty">
+                <div className="lists-empty-icon">🔎</div>
+                <h3>No Lists found</h3>
+                <p>
+                  There are no public lists available matching your search.
+                </p>
+              </div>
+            ) : (
+              <div className="lists-grid">
+                {filteredDiscoverLists.map((list) => (
+                  <div
+                    className="list-card"
+                    key={list.id}
+                    onClick={() => openListDetail(list.id)}
+                  >
+                    <div className="list-card-title">
+                      <h3>{list.name}</h3>
+                      <span>
+                        {list.isPrivate ? "🔒 Private" : "🌐 Public"}
+                      </span>
+                    </div>
 
-      <div className="detail-footer">
-        <Link href="/lists">Back to Your Lists</Link>
+                    <p className="list-card-description">
+                      {list.description || "No description available."}
+                    </p>
+
+                    <div className="list-card-footer">
+                      <span>
+                        👥 {list._count?.members ?? 0} members
+                      </span>
+                      <span className="view-list-link">
+                        View List →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Your Lists */}
+        {activeTab === "my" && (
+          <section className="lists-content">
+            {filteredMyLists.length === 0 ? (
+              <div className="lists-empty">
+                <div className="lists-empty-icon">📋</div>
+                <h3>You havent created any Lists yet</h3>
+                <p>
+                  Create your first List to organize your favorite people.
+                </p>
+
+                <button
+                  className="create-list-btn empty-create-btn"
+                  onClick={openCreateModal}
+                >
+                  + Create List
+                </button>
+              </div>
+            ) : (
+              <div className="lists-grid">
+                {filteredMyLists.map((list) => (
+                  <div
+                    className="list-card"
+                    key={list.id}
+                    onClick={() => openListDetail(list.id)}
+                  >
+                    <div className="list-card-top">
+                      <div className="list-card-title">
+                        <h3>{list.name}</h3>
+                        <span>
+                          {list.isPrivate ? "🔒 Private" : "🌐 Public"}
+                        </span>
+                      </div>
+
+                      <div className="list-menu-wrapper">
+                        <button
+                          className="list-menu-btn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId(
+                              openMenuId === list.id ? null : list.id
+                            );
+                          }}
+                          aria-label="List options"
+                        >
+                          ⋯
+                        </button>
+
+                        {openMenuId === list.id && (
+                          <div
+                            className="list-dropdown"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => openEditModal(list)}
+                            >
+                              ✏️ Edit
+                            </button>
+
+                            <button
+                              className="delete-option"
+                              onClick={() => handleDeleteList(list.id)}
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="list-card-description">
+                      {list.description || "No description available."}
+                    </p>
+
+                    <div className="list-card-footer">
+                      <span>
+                        👥 {list._count?.members ?? 0} members
+                      </span>
+                      <span className="view-list-link">
+                        View List →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
+
+      {/* Create / Edit Modal */}
+      {showModal && (
+        <div
+          className="list-modal-overlay"
+          onClick={closeModal}
+        >
+          <div
+            className="list-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="list-modal-header">
+              <h2>
+                {editingListId !== null ? "Edit List" : "Create a List"}
+              </h2>
+
+              <button
+                className="list-modal-close"
+                onClick={closeModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="list-form">
+              <label htmlFor="list-name">List Name</label>
+              <input
+                id="list-name"
+                type="text"
+                placeholder="Enter list name"
+                value={listName}
+                onChange={(event) => setListName(event.target.value)}
+              />
+
+              <label htmlFor="list-description">Description</label>
+              <textarea
+                id="list-description"
+                placeholder="Describe your list..."
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+              />
+
+              <label className="private-checkbox">
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(event) => setIsPrivate(event.target.checked)}
+                />
+                Make this List private
+              </label>
+
+              {formError && (
+                <p className="list-form-error">{formError}</p>
+              )}
+
+              <div className="list-modal-actions">
+                <button
+                  className="cancel-list-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="save-list-btn"
+                  onClick={handleSaveList}
+                >
+                  {editingListId !== null ? "Save Changes" : "Create List"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
