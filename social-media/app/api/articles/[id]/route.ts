@@ -24,6 +24,7 @@ export const GET = authed<Ctx>(async (me, _req, { params }) => {
     return json({
         ...a,
         likeCount: _count.likes,
+        isOwner: a.authorId === me.id,
         commentCount: _count.comments,
         liked: likes.length > 0,
         saved: bookmarks.length > 0,
