@@ -16,6 +16,9 @@ model User {
   username  String   @unique
   avatarUrl String?
   createdAt DateTime @default(now())
+  passwordHash  String?
+  emailVerified DateTime?
+  otpCodes      OtpCode[]
 
   // NOTIFICATION
   receivedNotifications Notification[] @relation("ReceivedNotifications")
@@ -232,4 +235,16 @@ model Bookmark {
 
   @@unique([postId, userId])
   @@index([userId, createdAt])
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
