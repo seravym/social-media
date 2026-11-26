@@ -1,179 +1,216 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { NotificationBadge } from "@/components/NotificationBadge";
+import Link from "next/link";
+
+interface Author {
+  id: string;
+  name: string | null;
+  username: string;
+  avatarUrl: string | null;
+}
 
 interface Post {
   id: string;
-  name: string;
-  handle: string;
-  time: string;
-  message: string;
-  replies: number;
-  likes: number;
-  views: string | number;
+  content: string;
+  views: number;
+  createdAt: string;
+  author: Author;
+  repliesCount: number;
+  likesCount: number;
+  isLiked: boolean;
+  isBookmarked: boolean;
 }
-
-const defaultPosts: Post[] = [
-  {
-    id: "post_alex_1",
-    name: "Alexander",
-    handle: "@alex_ander",
-    time: "2h",
-    message: "Tema pink ini keren banget! Semoga web-nya lancar!",
-    replies: 12,
-    likes: 48,
-    views: "1.2K",
-  },
-  {
-    id: "post_kat_1",
-    name: "Kat",
-    handle: "@trin_writes",
-    time: "4h",
-    message: "Still standing. Semoga sukses untuk UTS-nya!",
-    replies: 3,
-    likes: 15,
-    views: "500",
-  },
-];
-
-const STORE_ALL_POSTS = "xclone.posts.list";
 
 export default function HomePage() {
   const router = useRouter();
-  const [currentTab, setCurrentTab] = useState<"foryou" | "following">(
-    "foryou",
-  );
+  const [currentTab, setCurrentTab] = useState<"foryou" | "following">("foryou");
+  const [posts, setPosts] = useState<Post[]>([]);
   const [postText, setPostText] = useState("");
-  const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const [posts, setPosts] = useState<Post[]>(() => {
-    if (typeof window === "undefined") return defaultPosts;
-    const localPosts = JSON.parse(
-      localStorage.getItem(STORE_ALL_POSTS) || "null",
-    );
-    if (localPosts && localPosts.length > 0) {
-      return localPosts;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPosts() {
+      try {
+        const res = await fetch(`/api/posts?tab=${currentTab}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setErrorMsg(data.error || "Gagal memuat postingan");
+        } else {
+          setPosts(data.posts || []);
+        }
+      } catch {
+        if (!cancelled) setErrorMsg("Terjadi kesalahan jaringan");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    localStorage.setItem(STORE_ALL_POSTS, JSON.stringify(defaultPosts));
-    return defaultPosts;
-  });
 
-  const handleCreatePost = () => {
-    if (!postText.trim()) return;
-
-    const newPost: Post = {
-      id: "user_post_" + Date.now(),
-      name: "User",
-      handle: "@user",
-      time: "Now",
-      message: postText.trim(),
-      replies: 0,
-      likes: 0,
-      views: "0",
+    loadPosts();
+    return () => {
+      cancelled = true;
     };
+  }, [currentTab]);
 
-    const updatedPosts = [newPost, ...posts];
-    setPosts(updatedPosts);
-    localStorage.setItem(STORE_ALL_POSTS, JSON.stringify(updatedPosts));
-    setPostText("");
+  const handleTabChange = (tab: "foryou" | "following") => {
+    if (tab === currentTab) return;
+    setLoading(true);
+    setErrorMsg("");
+    setCurrentTab(tab);
   };
 
-  const handleToggleLike = (e: React.MouseEvent, postId: string) => {
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postText.trim()) return;
+
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: postText.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "Gagal membuat postingan");
+        return;
+      }
+
+      setPosts((prev) => [data.post, ...prev]);
+      setPostText("");
+    } catch {
+      setErrorMsg("Gagal mengirim postingan");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleLike = async (e: React.MouseEvent, postId: string) => {
     e.stopPropagation();
-    if (likedPosts.includes(postId)) {
-      setLikedPosts(likedPosts.filter((id) => id !== postId));
-    } else {
-      setLikedPosts([...likedPosts, postId]);
+    try {
+      const res = await fetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Gagal memproses like");
+        return;
+      }
+
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id !== postId) return post;
+          return {
+            ...post,
+            isLiked: data.liked,
+            likesCount: data.liked ? post.likesCount + 1 : post.likesCount - 1,
+          };
+        })
+      );
+    } catch {
+      alert("Terjadi kesalahan saat memproses like");
     }
   };
 
   return (
-    <div>
-      {/* Navigasi Sederhana */}
+    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px" }}>
       <nav>
-        <ul>
-          <li>
-            <a href="/home">Home</a>
-          </li>
-          <li>
-            <a href="/communities">Communities</a>
-          </li>
-          <li>
-            <a href="/notifications">
-              Notifications <NotificationBadge className="translate-y-[-1px]" />
-            </a>
-          </li>
+        <ul style={{ display: "flex", gap: "16px", listStyle: "none", padding: 0 }}>
+          <li><Link href="/home">Home</Link></li>
+          <li><Link href="/communities">Communities</Link></li>
+          <li><Link href="/follow">Follow</Link></li>
+          <li><Link href="/notifications">Notifications</Link></li>
+          <li><Link href="/login">Login</Link></li>
         </ul>
       </nav>
 
       <hr />
 
-      {/* Konten Utama */}
       <main>
         <h1>Home</h1>
 
         {/* Tab Navigasi */}
-        <div>
-          <button onClick={() => setCurrentTab("foryou")}>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+          <button onClick={() => handleTabChange("foryou")}>
             For You {currentTab === "foryou" && "(Aktif)"}
           </button>
-          <button onClick={() => setCurrentTab("following")}>
+          <button onClick={() => handleTabChange("following")}>
             Following {currentTab === "following" && "(Aktif)"}
           </button>
         </div>
 
         <hr />
 
-        {/* Kotak Buat Post */}
-        <div>
+        {/* Form Postingan */}
+        <form onSubmit={handleCreatePost} style={{ margin: "12px 0" }}>
           <h3>Buat Postingan Baru</h3>
           <textarea
             placeholder="What is happening?!"
             rows={3}
+            style={{ width: "100%" }}
             value={postText}
             onChange={(e) => setPostText(e.target.value)}
+            disabled={submitting}
           />
           <br />
-          <button onClick={handleCreatePost}>Post</button>
-        </div>
+          <button type="submit" disabled={submitting || !postText.trim()}>
+            {submitting ? "Mengirim..." : "Post"}
+          </button>
+        </form>
+
+        {errorMsg && <p style={{ color: "red" }}>{errorMsg}</p>}
 
         <hr />
 
-        {/* Daftar Postingan */}
+        {/* Feed Postingan */}
         <div>
           <h3>Linimasa (Feed)</h3>
-          {posts.map((post, index) => {
-            const postId = post.id || `post_index_${index}`;
-            const isLiked = likedPosts.includes(postId);
-            const displayLikes = (post.likes || 0) + (isLiked ? 1 : 0);
-
-            return (
+          {loading ? (
+            <p>Memuat postingan...</p>
+          ) : posts.length === 0 ? (
+            <p>
+              {currentTab === "following"
+                ? "Belum ada postingan dari akun yang kamu ikuti."
+                : "Belum ada postingan."}
+            </p>
+          ) : (
+            posts.map((post) => (
               <div
-                key={postId}
-                onClick={() => router.push(`/post/${postId}`)}
+                key={post.id}
+                onClick={() => router.push(`/post/${post.id}`)}
                 style={{
                   border: "1px solid gray",
                   margin: "10px 0",
-                  padding: "10px",
+                  padding: "12px",
                   cursor: "pointer",
                 }}
               >
                 <p>
-                  <strong>{post.name}</strong> {post.handle} - {post.time}
+                  <strong>{post.author.name || post.author.username}</strong>{" "}
+                  @{post.author.username} ·{" "}
+                  {new Date(post.createdAt).toLocaleString("id-ID")}
                 </p>
-                <p>{post.message}</p>
+                <p>{post.content}</p>
                 <div>
-                  <span>💬 {post.replies || 0}</span> |{" "}
-                  <button onClick={(e) => handleToggleLike(e, postId)}>
-                    {isLiked ? "❤️ Suka" : "🤍 Suka"} ({displayLikes})
+                  <span>💬 {post.repliesCount}</span> |{" "}
+                  <button onClick={(e) => handleToggleLike(e, post.id)}>
+                    {post.isLiked ? "❤️" : "🤍"} ({post.likesCount})
                   </button>{" "}
-                  | <span>📊 {post.views || 0}</span>
+                  | <span>📊 {post.views}</span>
                 </div>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
       </main>
     </div>
