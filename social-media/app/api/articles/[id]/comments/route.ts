@@ -1,91 +1,50 @@
-
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { authed, json } from "@/lib/route";
 
-type Context = {
-    params: Promise<{ id: string }>;
-};
+type Ctx = { params: Promise<{ id: string }> };
+const MAX_COMMENT = 500;
 
-export async function GET(
-request: NextRequest,
-{ params }: Context
-) {
-try {
-const { id } = await params;
+export const GET = authed<Ctx>(async (me, _req, { params }) => {
+    const { id } = await params;
 
-const comments = await prisma.articleComment.findMany({
-    where: { articleId: id },
-    include: {
-    user: {
-        select: {
-        id: true,
-        name: true,
-        username: true,
-        avatarUrl: true,
-        },
-    },
-    },
-    orderBy: { createdAt: "asc" },
-});
+    const comments = await prisma.articleComment.findMany({
+        where: { articleId: id },
+        orderBy: { createdAt: "desc" },
+    });
 
-return NextResponse.json(comments);
-} catch (error) {
-return NextResponse.json(
-    { error: "Gagal mengambil komentar" },
-    { status: 500 }
-);
-}
-}
+    const userIds = [...new Set(comments.map((c) => c.userId))];
+    const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, username: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
 
-export async function POST(
-request: NextRequest,
-{ params }: Context
-) {
-try {
-const { id } = await params;
-const { content, userId } = await request.json();
-
-if (!content?.trim() || !userId) {
-    return NextResponse.json(
-    { error: "Komentar dan userId wajib diisi" },
-    { status: 400 }
+    return json(
+        comments.map((c) => ({
+        id: c.id,
+        content: c.content,
+        createdAt: c.createdAt,
+        author: byId.get(c.userId) ?? null,
+        isOwner: c.userId === me.id,
+        }))
     );
-}
+    });
 
-const article = await prisma.article.findUnique({
-    where: { id },
+    export const POST = authed<Ctx>(async (me, req, { params }) => {
+    const { id } = await params;
+
+    const article = await prisma.article.findUnique({ where: { id }, select: { id: true } });
+    if (!article) return json({ error: "Artikel tidak ditemukan" }, 404);
+
+    const body = await req.json().catch(() => null);
+    const content = String(body?.content ?? "").trim();
+
+    if (!content) return json({ error: "Komentar tidak boleh kosong." }, 400);
+    if (content.length > MAX_COMMENT)
+        return json({ error: `Komentar maksimal ${MAX_COMMENT} karakter.` }, 400);
+
+    const comment = await prisma.articleComment.create({
+        data: { articleId: id, userId: me.id, content },
+    });
+    return json(comment, 201);
 });
-
-if (!article) {
-    return NextResponse.json(
-    { error: "Artikel tidak ditemukan" },
-    { status: 404 }
-    );
-}
-
-const comment = await prisma.articleComment.create({
-    data: {
-    articleId: id,
-    userId,
-    content: content.trim(),
-    },
-    include: {
-    user: {
-        select: {
-        id: true,
-        name: true,
-        username: true,
-        avatarUrl: true,
-        },
-    },
-    },
-});
-
-return NextResponse.json(comment, { status: 201 });
-} catch (error) {
-return NextResponse.json(
-    { error: "Gagal menambahkan komentar" },
-    { status: 500 }
-);
-}
-}
