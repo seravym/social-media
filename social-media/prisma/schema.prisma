@@ -171,6 +171,8 @@ model Article {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   publishedAt   DateTime?
+  category String @default("Technology")
+  views    Int    @default(0)
 
   author    User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   comments  ArticleComment[]

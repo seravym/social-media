@@ -1,81 +1,67 @@
-
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { authed, json } from "@/lib/route";
 
-export async function GET() {
-  try {
-    const articles = await prisma.article.findMany({
-      include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+const CATEGORIES = ["Technology", "Design", "Data", "Food", "Travel"];
 
-    return NextResponse.json(articles);
-  } catch (error) {
-    console.error("GET ARTICLES ERROR:", error);
+export const GET = authed(async (me, req) => {
+  const { searchParams } = new URL(req.url);
+  const category = searchParams.get("category");
+  const q = (searchParams.get("q") ?? "").trim();
+  const author = searchParams.get("author");
+  const saved = searchParams.get("saved") === "1";
 
-    return NextResponse.json(
-      { error: String(error) },
-      { status: 500 }
-    );
-  }
-}
+  const wordFilters = q
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => ({
+      OR: [
+        { title: { contains: w, mode: "insensitive" as const } },
+        { content: { contains: w, mode: "insensitive" as const } },
+        { author: { name: { contains: w, mode: "insensitive" as const } } },
+        { author: { username: { contains: w, mode: "insensitive" as const } } },
+      ],
+    }));
 
-    export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { title, content, coverImageUrl, userId } = body;
+  const articles = await prisma.article.findMany({
+    where: {
+      status: "published",
+      ...(category && CATEGORIES.includes(category) ? { category } : {}),
+      ...(author ? { author: { username: author } } : {}),
+      ...(saved ? { bookmarks: { some: { userId: me.id } } } : {}),
+      AND: wordFilters,
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      author: { select: { id: true, name: true, username: true, avatarUrl: true } },
+      _count: { select: { likes: true, comments: true } },
+      likes: { where: { userId: me.id }, select: { userId: true } },
+      bookmarks: { where: { userId: me.id }, select: { userId: true } },
+    },
+  });
 
-        if (!title || !content || !userId) {
-        return NextResponse.json(
-            { error: "Title, content, dan userId wajib diisi" },
-            { status: 400 }
-        );
-        }
+  return json(
+    articles.map(({ likes, bookmarks, _count, ...a }) => ({
+      ...a,
+      likeCount: _count.likes,
+      commentCount: _count.comments,
+      liked: likes.length > 0,
+      saved: bookmarks.length > 0,
+    }))
+  );
+});
 
-        const user = await prisma.user.findUnique({
-        where: { id: userId },
-        });
+export const POST = authed(async (me, req) => {
+  const body = await req.json().catch(() => null);
+  const title = String(body?.title ?? "").trim();
+  const content = String(body?.content ?? "").trim();
+  const category = String(body?.category ?? "");
 
-        if (!user) {
-        return NextResponse.json(
-            { error: "User tidak ditemukan" },
-            { status: 404 }
-        );
-        }
+  if (title.length < 5) return json({ error: "Judul minimal 5 karakter." }, 400);
+  if (content.length < 80) return json({ error: "Isi minimal 80 karakter." }, 400);
+  if (!CATEGORIES.includes(category)) return json({ error: "Kategori tidak valid." }, 400);
 
-        const article = await prisma.article.create({
-        data: {
-            title,
-            content,
-            coverImageUrl: coverImageUrl || null,
-            authorId: userId,
-            status: "published",
-            publishedAt: new Date(),
-        },
-        });
-
-        return NextResponse.json(article, { status: 201 });
-    } catch (error) {
-        return NextResponse.json(
-        { error: "Gagal membuat artikel" },
-        { status: 500 }
-        );
-    }
-}
+  const article = await prisma.article.create({
+    data: { title, content, category, authorId: me.id, publishedAt: new Date() },
+  });
+  return json(article, 201);
+});
