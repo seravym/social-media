@@ -9,7 +9,6 @@ export async function GET(request: NextRequest) {
 
     let whereClause = {};
 
-    // Filter khusus tab "following"
     if (tab === "following") {
       if (!currentUserId) {
         return NextResponse.json({ posts: [] });
@@ -46,7 +45,6 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Cek status bookmark dari tabel Bookmark yang sudah ada
     let bookmarkedIds = new Set<string>();
     if (currentUserId && posts.length > 0) {
       const bookmarks = await prisma.bookmark.findMany({
@@ -85,7 +83,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const content = body.content ?? body.message;
-    // Pakai user dari session, atau fallback ke body.userId saat testing di EchoAPI
     const userId = (await getSessionUserId()) || body.userId;
 
     if (!userId) {
