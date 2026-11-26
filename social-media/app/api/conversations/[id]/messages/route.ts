@@ -3,9 +3,30 @@ import { prisma } from "@/lib/prisma";
 import { authed, json } from "@/lib/route";
 import type { ChatMessageDto } from "@/lib/types";
 
-const messageSchema = z.object({
-  body: z.string().trim().min(1).max(4000),
-});
+const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+const HTTP_URL_RE = /^https?:\/\/.+/i;
+
+function isValidImageUrl(value: string): boolean {
+  return IMAGE_DATA_URL_RE.test(value) || HTTP_URL_RE.test(value);
+}
+
+const messageSchema = z
+  .object({
+    body: z.string().trim().max(4000).optional().default(""),
+    imageUrl: z
+      .string()
+      .trim()
+      .max(2_000_000)
+      .refine((v) => v === "" || isValidImageUrl(v), {
+        message: "Invalid image URL or data URL",
+      })
+      .nullable()
+      .optional(),
+  })
+  .refine(
+    (data) => data.body.length > 0 || Boolean(data.imageUrl && data.imageUrl.length > 0),
+    { message: "Message body or imageUrl is required" }
+  );
 
 export const POST = authed<{ params: Promise<{ id: string }> }>(
   async (user, req, { params }) => {
@@ -13,7 +34,10 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
 
     const parsed = messageSchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
-      return json({ error: "Message must be 1-4000 characters" }, 400);
+      return json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid message payload" },
+        400
+      );
     }
 
     const membership = await prisma.conversationMember.findUnique({
@@ -24,6 +48,11 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
       return json({ error: "Conversation not found" }, 404);
     }
 
+    const normalizedImageUrl =
+      parsed.data.imageUrl && parsed.data.imageUrl.length > 0
+        ? parsed.data.imageUrl
+        : null;
+
     const now = new Date();
     const [message] = await prisma.$transaction([
       prisma.message.create({
@@ -31,6 +60,7 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
           conversationId: id,
           senderId: user.id,
           body: parsed.data.body,
+          imageUrl: normalizedImageUrl,
         },
       }),
       prisma.conversation.update({
@@ -47,6 +77,7 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
       id: message.id,
       senderId: message.senderId,
       body: message.body,
+      imageUrl: message.imageUrl,
       createdAt: message.createdAt.toISOString(),
     };
 

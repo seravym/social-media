@@ -35,11 +35,14 @@ export const GET = authed(async (user) => {
     return {
       id: m.conversationId,
       other: otherMember ? toUserCard(otherMember.user) : null,
+      nickname: otherMember?.nickname ?? null,
+      background: m.conversation.background ?? null,
       lastMessage: lastMsg
         ? {
             id: lastMsg.id,
             senderId: lastMsg.senderId,
             body: lastMsg.body,
+            imageUrl: lastMsg.imageUrl,
             createdAt: lastMsg.createdAt.toISOString(),
           }
         : null,

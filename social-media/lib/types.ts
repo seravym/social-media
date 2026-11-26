@@ -18,12 +18,20 @@ export interface ChatMessageDto {
   id: string;
   senderId: string;
   body: string;
+  imageUrl: string | null;
   createdAt: string;
+}
+
+export interface ConversationMemberDto {
+  user: UserCard;
+  nickname: string | null;
 }
 
 export interface ConversationDto {
   id: string;
   other: UserCard | null;
+  nickname: string | null;
+  background: string | null;
   lastMessage: ChatMessageDto | null;
   unreadCount: number;
   updatedAt: string;
@@ -31,6 +39,9 @@ export interface ConversationDto {
 
 export interface ConversationDetailDto {
   id: string;
+  background: string | null;
   other: UserCard | null;
+  nickname: string | null;
+  members: ConversationMemberDto[];
   messages: ChatMessageDto[];
 }
