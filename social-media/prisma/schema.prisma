@@ -123,11 +123,12 @@ model Notification {
 
 // CHAT
 model Conversation {
-  id        String   @id @default(cuid())
-  type      String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  type       String
+  name       String?
+  background String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   members  ConversationMember[]
   messages Message[]
@@ -136,6 +137,7 @@ model Conversation {
 model ConversationMember {
   conversationId String
   userId         String
+  nickname       String?
   status         String   @default("active")
   lastReadAt     DateTime @default(now())
   joinedAt       DateTime @default(now())
@@ -151,7 +153,8 @@ model Message {
   id             String   @id @default(cuid())
   conversationId String
   senderId       String
-  body           String
+  body           String   @default("")
+  imageUrl       String?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
