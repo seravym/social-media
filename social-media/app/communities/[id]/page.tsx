@@ -1,0 +1,481 @@
+"use client";
+
+import { Suspense, useEffect, useState, FormEvent } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import "./detail.css";
+
+type Author = {
+  id: string;
+  name: string | null;
+  username: string;
+  avatarUrl: string | null;
+};
+
+type Post = {
+  id: string;
+  content: string;
+  views: number;
+  createdAt: string;
+  author: Author;
+  isLiked: boolean;
+  _count: {
+    comments: number;
+    likes: number;
+  };
+};
+
+type Community = {
+  id: number;
+  name: string;
+  description: string | null;
+  image: string | null;
+  creatorId: string;
+  createdAt: string;
+  creator: Author;
+  members: {
+    userId: string;
+  }[];
+  posts: Post[];
+  _count: {
+    members: number;
+    posts: number;
+  };
+};
+
+function CommunityDetailContent() {
+  const params = useParams<{ id: string }>();
+  const communityId = params.id;
+
+  const [community, setCommunity] = useState<Community | null>(null);
+  const [isJoined, setIsJoined] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [likingPosts, setLikingPosts] = useState<string[]>([]);
+  const [postContent, setPostContent] = useState("");
+  const [error, setError] = useState("");
+
+  async function loadCommunity() {
+    const response = await fetch(`/api/commmunities/${communityId}`);
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || result.error || "Failed to fetch community."
+      );
+    }
+
+    setCommunity(result.data);
+  }
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadData() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [communityResponse, membershipResponse] =
+          await Promise.all([
+            fetch(`/api/commmunities/${communityId}`),
+            fetch(`/api/commmunities/${communityId}/membership`),
+          ]);
+
+        const communityResult = await communityResponse.json();
+        const membershipResult = await membershipResponse.json();
+
+        if (!communityResponse.ok || !communityResult.success) {
+          throw new Error(
+            communityResult.message ||
+              communityResult.error ||
+              `Failed to fetch community (${communityResponse.status})`
+          );
+        }
+
+        if (!membershipResponse.ok || !membershipResult.success) {
+          throw new Error(
+            membershipResult.message ||
+              membershipResult.error ||
+              `Failed to check membership (${membershipResponse.status})`
+          );
+        }
+
+        if (!ignore) {
+          setCommunity(communityResult.data);
+          setIsJoined(membershipResult.isMember);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err instanceof Error ? err.message : "Something went wrong."
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
+  }, [communityId]);
+
+  async function handleMembership() {
+    if (!community) return;
+
+    setProcessing(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}/membership`,
+        {
+          method: isJoined ? "DELETE" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to update membership."
+        );
+      }
+
+      setIsJoined(!isJoined);
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          _count: {
+            ...previous._count,
+            members: Math.max(
+              0,
+              previous._count.members + (isJoined ? -1 : 1)
+            ),
+          },
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!community || !isJoined || !postContent.trim()) return;
+
+    setPosting(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: postContent.trim(),
+          communityId: community.id,
+          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to create post."
+        );
+      }
+
+      setPostContent("");
+      await loadCommunity();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function handleLike(postId: string) {
+    if (likingPosts.includes(postId)) return;
+
+    setLikingPosts((previous) => [...previous, postId]);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || result.error || "Failed to update like."
+        );
+      }
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((post) => {
+            if (post.id !== postId) return post;
+
+            return {
+              ...post,
+              isLiked: result.liked,
+              _count: {
+                ...post._count,
+                likes: Math.max(
+                  0,
+                  post._count.likes + (result.liked ? 1 : -1)
+                ),
+              },
+            };
+          }),
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setLikingPosts((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
+  function formatDate(date: string) {
+    return new Date(date).toLocaleString("id-ID", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="community-detail-page">
+        <p className="detail-loading">Loading community...</p>
+      </div>
+    );
+  }
+
+  if (!community) {
+    return (
+      <div className="community-detail-page">
+        <Link href="/communities" className="detail-back">
+          ← Back to Communities
+        </Link>
+
+        <div className="detail-error">
+          {error || "Community not found."}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="community-detail-page">
+      <div className="community-detail-container">
+        <Link href="/communities" className="detail-back">
+          ← Back to Communities
+        </Link>
+
+        {error && <div className="detail-error">{error}</div>}
+
+        <section className="detail-community-header">
+          <div className="detail-community-image">
+            {community.image ? (
+              <img src={community.image} alt={community.name} />
+            ) : (
+              <span>🌷</span>
+            )}
+          </div>
+
+          <div className="detail-community-info">
+            <p className="detail-subtitle">COMMUNITY</p>
+
+            <h1>{community.name}</h1>
+
+            <p className="detail-description">
+              {community.description || "No description available."}
+            </p>
+
+            <div className="detail-meta">
+              <span>👥 {community._count.members} members</span>
+              <span>📝 {community._count.posts} posts</span>
+            </div>
+
+            <p className="detail-creator">
+              Created by{" "}
+              <strong>
+                {community.creator.name || community.creator.username}
+              </strong>
+            </p>
+
+            <button
+              type="button"
+              className={
+                isJoined ? "detail-leave-btn" : "detail-join-btn"
+              }
+              onClick={handleMembership}
+              disabled={processing}
+            >
+              {processing
+                ? "Please wait..."
+                : isJoined
+                  ? "Leave Community"
+                  : "Join Community"}
+            </button>
+          </div>
+        </section>
+
+        <section className="detail-posts-section">
+          <div className="detail-posts-heading">
+            <h2>Community Posts</h2>
+            <span>{community._count.posts} posts</span>
+          </div>
+
+          {isJoined ? (
+            <form
+              className="detail-create-post"
+              onSubmit={handleCreatePost}
+            >
+              <h3>Share something with the community 🌸</h3>
+
+              <textarea
+                value={postContent}
+                onChange={(event) => setPostContent(event.target.value)}
+                placeholder={`What's happening in ${community.name}?`}
+                rows={4}
+                maxLength={1000}
+                required
+              />
+
+              <div className="detail-create-post-footer">
+                <span>{postContent.length}/1000</span>
+
+                <button
+                  type="submit"
+                  disabled={posting || !postContent.trim()}
+                >
+                  {posting ? "Posting..." : "Post"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="detail-join-notice">
+              <p>Join this community to share your posts! 🌷</p>
+            </div>
+          )}
+
+          {community.posts.length === 0 ? (
+            <div className="detail-empty">
+              <div>🌸</div>
+              <h3>No posts yet</h3>
+              <p>
+                Be the first to share something with this community!
+              </p>
+            </div>
+          ) : (
+            <div className="detail-post-list">
+              {community.posts.map((post) => (
+                <article className="detail-post-card" key={post.id}>
+                  <div className="detail-post-author">
+                    {post.author.avatarUrl ? (
+                      <img
+                        src={post.author.avatarUrl}
+                        alt={post.author.username}
+                      />
+                    ) : (
+                      <div className="detail-avatar-placeholder">
+                        {(post.author.name || post.author.username)
+                          .charAt(0)
+                          .toUpperCase()}
+                      </div>
+                    )}
+
+                    <div>
+                      <strong>
+                        {post.author.name || post.author.username}
+                      </strong>
+                      <span>@{post.author.username}</span>
+                    </div>
+                  </div>
+
+                  <p className="detail-post-content">{post.content}</p>
+
+                  <div className="detail-post-footer">
+                    <span>{formatDate(post.createdAt)}</span>
+
+                    <button
+                      type="button"
+                      className={`detail-action-btn ${
+                        post.isLiked ? "liked" : ""
+                      }`}
+                      onClick={() => handleLike(post.id)}
+                      disabled={likingPosts.includes(post.id)}
+                      aria-label={post.isLiked ? "Unlike post" : "Like post"}
+                    >
+                      <span>{post.isLiked ? "❤️" : "♡"}</span>
+                      <span>{post._count.likes}</span>
+                    </button>
+
+                    <span>💬 {post._count.comments}</span>
+                    <span>👁 {post.views}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default function CommunityDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="community-detail-page">
+          <p className="detail-loading">Loading community...</p>
+        </div>
+      }
+    >
+      <CommunityDetailContent />
+    </Suspense>
+  );
+}

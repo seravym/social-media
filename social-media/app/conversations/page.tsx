@@ -8,6 +8,11 @@ import type {
 } from "@/lib/types";
 import { ChatSidebar } from "@/components/conversations/ChatSidebar";
 import { ChatWindow } from "@/components/conversations/ChatWindow";
+import {
+  ChatSettingsDrawer,
+  type DrawerMode,
+  type SettingsDraft,
+} from "@/components/conversations/ChatSettingsDrawer";
 
 const SELF_NOTES_KEY = "social_media_self_notes_v1";
 
@@ -27,8 +32,10 @@ export default function ConversationsPage() {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [replyDraft, setReplyDraft] = useState("");
   const [vanishMode, setVanishMode] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showMedia, setShowMedia] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
+  const [previewSettings, setPreviewSettings] = useState<SettingsDraft | null>(
+    null,
+  );
   const [loadingList, setLoadingList] = useState(true);
   const [loadingChat, setLoadingChat] = useState(false);
 
@@ -62,7 +69,7 @@ export default function ConversationsPage() {
       const data = (await res.json()) as ConversationDetailDto;
       setDetail(data);
       setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)),
       );
       fetch(`/api/conversations/${id}/read`, { method: "POST" });
     } finally {
@@ -72,8 +79,8 @@ export default function ConversationsPage() {
 
   const handleSelectChat = (id: string) => {
     setSelectedId(id);
-    setShowSettings(false);
-    setShowMedia(false);
+    setDrawerMode(null);
+    setPreviewSettings(null);
     if (id === "self-notes") {
       setDetail(null);
       setLoadingChat(false);
@@ -98,13 +105,27 @@ export default function ConversationsPage() {
 
   const handleTogglePin = (id: string) => {
     setPinnedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const handleReplyNote = (conversationId: string, noteText: string) => {
     setReplyDraft(`Balas note "${noteText}": `);
     handleSelectChat(conversationId);
+  };
+
+  const handleSaveSettings = (updated: SettingsDraft) => {
+    if (!selectedId || isSelfNotes) return;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedId ? { ...c, ...updated } : c)),
+    );
+    setDetail((prev) => (prev ? { ...prev, ...updated } : prev));
+    setPreviewSettings(null);
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerMode(null);
+    setPreviewSettings(null);
   };
 
   const handleSendMessage = async (body: string, imageUrl: string | null) => {
@@ -142,7 +163,7 @@ export default function ConversationsPage() {
     setDetail((prev) =>
       prev
         ? { ...prev, messages: [...prev.messages, optimisticMessage] }
-        : prev
+        : prev,
     );
 
     try {
@@ -154,8 +175,11 @@ export default function ConversationsPage() {
       if (!res.ok) {
         setDetail((prev) =>
           prev
-            ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) }
-            : prev
+            ? {
+                ...prev,
+                messages: prev.messages.filter((m) => m.id !== tempId),
+              }
+            : prev,
         );
         return;
       }
@@ -164,39 +188,66 @@ export default function ConversationsPage() {
         prev
           ? {
               ...prev,
-              messages: prev.messages.map((m) => (m.id === tempId ? created : m)),
+              messages: prev.messages.map((m) =>
+                m.id === tempId ? created : m,
+              ),
             }
-          : prev
+          : prev,
       );
       loadConversations();
     } catch {
       setDetail((prev) =>
         prev
           ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) }
-          : prev
+          : prev,
       );
     }
   };
 
+  const originalDisplayName =
+    detail?.other?.displayName || selectedChat?.other?.displayName || "User";
+  const savedNickname = isSelfNotes
+    ? null
+    : (detail?.nickname ?? selectedChat?.nickname ?? null);
+  const savedBackground = isSelfNotes
+    ? null
+    : (detail?.background ?? selectedChat?.background ?? null);
+
+  const effectiveNickname = previewSettings
+    ? previewSettings.nickname
+    : savedNickname;
+  const effectiveBackground = previewSettings
+    ? previewSettings.background
+    : savedBackground;
+
   const activeName = isSelfNotes
     ? "Catatan Pribadi"
-    : detail?.nickname ||
-      selectedChat?.nickname ||
-      detail?.other?.displayName ||
-      selectedChat?.other?.displayName ||
-      "User";
+    : effectiveNickname || originalDisplayName;
   const activeSubtitle = isSelfNotes
     ? "Tersimpan di perangkat ini"
     : `@${detail?.other?.username || selectedChat?.other?.username || "user"}`;
   const activeAvatar = isSelfNotes
     ? null
-    : detail?.other?.avatarUrl ?? selectedChat?.other?.avatarUrl ?? null;
+    : (detail?.other?.avatarUrl ?? selectedChat?.other?.avatarUrl ?? null);
+  const activeMessages = isSelfNotes ? selfMessages : (detail?.messages ?? []);
+
+  const displayConversations = conversations.map((c) =>
+    c.id === selectedId && previewSettings
+      ? {
+          ...c,
+          nickname: previewSettings.nickname,
+          background: previewSettings.background,
+        }
+      : c,
+  );
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-rose-100/70 via-slate-100 to-pink-100/70 p-2 text-slate-900 sm:p-4">
+    <div
+      className={`min-h-dvh p-2 text-slate-900 transition-colors sm:p-4 ${vanishMode ? "bg-dot-canvas-dark" : "bg-dot-canvas"}`}
+    >
       <div className="mx-auto flex h-[calc(100dvh-1rem)] max-w-6xl gap-4 sm:h-[calc(100dvh-2rem)]">
         <ChatSidebar
-          conversations={conversations}
+          conversations={displayConversations}
           selectedId={selectedId}
           loading={loadingList}
           pinnedIds={pinnedIds}
@@ -209,12 +260,18 @@ export default function ConversationsPage() {
         <main
           className={`${
             selectedId ? "flex" : "hidden md:flex"
-          } relative flex-1 flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/75 shadow-sm backdrop-blur-md`}
+          } glass-panel relative flex-1 overflow-hidden rounded-2xl`}
         >
           {!selectedId ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-white/80 bg-white/70 text-slate-400 shadow-xs">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400">
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
@@ -226,35 +283,54 @@ export default function ConversationsPage() {
               </p>
             </div>
           ) : (
-            <ChatWindow
-              key={selectedId}
-              name={activeName}
-              subtitle={activeSubtitle}
-              avatarUrl={activeAvatar}
-              currentUserId={currentUserId}
-              isSelfNotes={isSelfNotes}
-              loading={loadingChat}
-              messages={isSelfNotes ? selfMessages : detail?.messages ?? []}
-              background={
-                isSelfNotes
-                  ? null
-                  : detail?.background ?? selectedChat?.background ?? null
-              }
-              vanishMode={vanishMode}
-              initialDraft={replyDraft}
-              onClearInitialDraft={() => setReplyDraft("")}
-              onBack={() => setSelectedId(null)}
-              onSendMessage={handleSendMessage}
-              onOpenMedia={() => setShowMedia((prev) => !prev)}
-              onOpenSettings={() => setShowSettings((prev) => !prev)}
-            />
-          )}
+            <div className="relative flex min-w-0 flex-1 overflow-hidden">
+              <ChatWindow
+                key={`window-${selectedId}`}
+                name={activeName}
+                subtitle={activeSubtitle}
+                avatarUrl={activeAvatar}
+                currentUserId={currentUserId}
+                isSelfNotes={isSelfNotes}
+                loading={loadingChat}
+                messages={activeMessages}
+                background={effectiveBackground}
+                vanishMode={vanishMode}
+                initialDraft={replyDraft}
+                onClearInitialDraft={() => setReplyDraft("")}
+                onBack={() => {
+                  setSelectedId(null);
+                  setDrawerMode(null);
+                  setPreviewSettings(null);
+                }}
+                onSendMessage={handleSendMessage}
+                onOpenMedia={() =>
+                  setDrawerMode((prev) => (prev === "media" ? null : "media"))
+                }
+                onOpenSettings={() =>
+                  setDrawerMode((prev) =>
+                    prev === "settings" ? null : "settings",
+                  )
+                }
+              />
 
-          {(showSettings || showMedia) && (
-            <div className="border-t border-slate-200/60 bg-white/80 px-4 py-2 text-xs text-slate-500 backdrop-blur-md">
-              {showSettings
-                ? "Pengaturan obrolan sedang disiapkan."
-                : "Galeri media sedang disiapkan."}
+              {drawerMode && (
+                <ChatSettingsDrawer
+                  key={`drawer-${selectedId}`}
+                  mode={drawerMode}
+                  isSelfNotes={isSelfNotes}
+                  conversationId={isSelfNotes ? null : selectedId}
+                  displayName={originalDisplayName}
+                  nickname={savedNickname}
+                  background={savedBackground}
+                  messages={activeMessages}
+                  vanishMode={vanishMode}
+                  onChangeMode={setDrawerMode}
+                  onToggleVanish={setVanishMode}
+                  onPreviewChange={setPreviewSettings}
+                  onSaveSettings={handleSaveSettings}
+                  onClose={handleCloseDrawer}
+                />
+              )}
             </div>
           )}
         </main>
