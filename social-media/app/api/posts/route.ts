@@ -13,12 +13,17 @@ export async function GET(request: NextRequest) {
       if (!currentUserId) {
         return NextResponse.json({ posts: [] });
       }
+
       const follows = await prisma.follow.findMany({
         where: { followerId: currentUserId },
         select: { followingId: true },
       });
+
       const followingIds = follows.map((f) => f.followingId);
-      whereClause = { authorId: { in: followingIds } };
+
+      whereClause = {
+        authorId: { in: followingIds },
+      };
     }
 
     const posts = await prisma.post.findMany({
@@ -39,13 +44,19 @@ export async function GET(request: NextRequest) {
           },
         },
         likes: currentUserId
-          ? { where: { userId: currentUserId }, select: { id: true } }
+          ? {
+              where: { userId: currentUserId },
+              select: { id: true },
+            }
           : false,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
     let bookmarkedIds = new Set<string>();
+
     if (currentUserId && posts.length > 0) {
       const bookmarks = await prisma.bookmark.findMany({
         where: {
@@ -54,7 +65,10 @@ export async function GET(request: NextRequest) {
         },
         select: { postId: true },
       });
-      bookmarkedIds = new Set(bookmarks.map((b) => b.postId));
+
+      bookmarkedIds = new Set(
+        bookmarks.map((b) => b.postId)
+      );
     }
 
     const formatted = posts.map((p) => ({
@@ -72,6 +86,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ posts: formatted });
   } catch (error) {
     console.error("GET /api/posts error:", error);
+
     return NextResponse.json(
       { error: "Gagal mengambil postingan" },
       { status: 500 }
@@ -82,8 +97,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
     const content = body.content ?? body.message;
     const userId = (await getSessionUserId()) || body.userId;
+
+    const communityId =
+      body.communityId !== undefined &&
+      body.communityId !== null &&
+      body.communityId !== ""
+        ? Number(body.communityId)
+        : null;
 
     if (!userId) {
       return NextResponse.json(
@@ -92,17 +115,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!content || !content.trim()) {
+    if (!content || typeof content !== "string" || !content.trim()) {
       return NextResponse.json(
         { error: "Isi postingan tidak boleh kosong" },
         { status: 400 }
       );
     }
 
+    // Jika post dibuat di dalam community,
+    // pastikan community tersedia dan user sudah bergabung.
+    if (communityId !== null) {
+      if (
+        !Number.isInteger(communityId) ||
+        communityId <= 0
+      ) {
+        return NextResponse.json(
+          { error: "Community ID tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      const community = await prisma.community.findUnique({
+        where: { id: communityId },
+      });
+
+      if (!community) {
+        return NextResponse.json(
+          { error: "Community tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+
+      const membership = await prisma.communityMember.findUnique({
+        where: {
+          userId_communityId: {
+            userId,
+            communityId,
+          },
+        },
+      });
+
+      if (!membership) {
+        return NextResponse.json(
+          { error: "Join community terlebih dahulu untuk membuat post" },
+          { status: 403 }
+        );
+      }
+    }
+
     const newPost = await prisma.post.create({
       data: {
         content: content.trim(),
         authorId: userId,
+        ...(communityId !== null
+          ? { communityId }
+          : {}),
       },
       include: {
         author: {
@@ -118,6 +185,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
+        success: true,
         post: {
           id: newPost.id,
           content: newPost.content,
@@ -128,12 +196,14 @@ export async function POST(request: NextRequest) {
           likesCount: 0,
           isLiked: false,
           isBookmarked: false,
+          communityId: newPost.communityId,
         },
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("POST /api/posts error:", error);
+
     return NextResponse.json(
       { error: "Gagal membuat postingan" },
       { status: 500 }

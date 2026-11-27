@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import "./communities.css";
 
 type Community = {
@@ -11,16 +12,21 @@ type Community = {
   image: string | null;
   creatorId: string;
   createdAt: string;
+  isJoined: boolean;
   _count?: {
     members: number;
   };
 };
 
 export default function CommunitiesPage() {
+  const router = useRouter();
+
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const [showModal, setShowModal] = useState(false);
   const [communityName, setCommunityName] = useState("");
@@ -36,7 +42,31 @@ export default function CommunitiesPage() {
       throw new Error(result.message || "Failed to fetch communities");
     }
 
-    return result.data;
+    const communitiesData = result.data as Community[];
+
+    return Promise.all(
+      communitiesData.map(async (community) => {
+        try {
+          const membershipResponse = await fetch(
+            `/api/commmunities/${community.id}/membership`
+          );
+
+          const membershipResult = await membershipResponse.json();
+
+          return {
+            ...community,
+            isJoined: membershipResponse.ok
+              ? membershipResult.isMember
+              : false,
+          };
+        } catch {
+          return {
+            ...community,
+            isJoined: false,
+          };
+        }
+      })
+    );
   }
 
   useEffect(() => {
@@ -66,9 +96,60 @@ export default function CommunitiesPage() {
     community.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  async function handleCreateCommunity(
-    e: FormEvent<HTMLFormElement>
-  ) {
+  async function handleMembership(community: Community) {
+    setProcessingId(community.id);
+    setActionError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}/membership`,
+        {
+          method: community.isJoined ? "DELETE" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to update membership");
+      }
+
+      setCommunities((previous) =>
+        previous.map((item) =>
+          item.id === community.id
+            ? {
+                ...item,
+                isJoined: !community.isJoined,
+                _count: {
+                  members: Math.max(
+                    0,
+                    (item._count?.members ?? 0) +
+                      (community.isJoined ? -1 : 1)
+                  ),
+                },
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Community Membership Error:", error);
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function handleCreateCommunity(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!communityName.trim()) {
@@ -161,6 +242,10 @@ export default function CommunitiesPage() {
           />
         </div>
 
+        {actionError && (
+          <p className="form-error">{actionError}</p>
+        )}
+
         {loading ? (
           <p className="community-loading">
             Loading communities...
@@ -182,7 +267,14 @@ export default function CommunitiesPage() {
         ) : (
           <div className="community-grid">
             {filteredCommunities.map((community) => (
-              <div className="community-card" key={community.id}>
+              <div
+                className="community-card"
+                key={community.id}
+                onClick={() =>
+                  router.push(`/communities/${community.id}`)
+                }
+                style={{ cursor: "pointer" }}
+              >
                 <div className="community-image">
                   {community.image ? (
                     <img
@@ -204,6 +296,26 @@ export default function CommunitiesPage() {
                   <span className="community-members">
                     {community._count?.members ?? 0} members
                   </span>
+
+                  <button
+                    type="button"
+                    className={
+                      community.isJoined
+                        ? "leave-community-btn"
+                        : "join-community-btn"
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMembership(community);
+                    }}
+                    disabled={processingId === community.id}
+                  >
+                    {processingId === community.id
+                      ? "Please wait..."
+                      : community.isJoined
+                        ? "Leave"
+                        : "Join"}
+                  </button>
                 </div>
               </div>
             ))}
