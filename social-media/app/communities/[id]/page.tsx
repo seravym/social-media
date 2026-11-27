@@ -2,7 +2,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, FormEvent } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import "./detail.css";
 
@@ -40,6 +40,7 @@ type Community = {
   description: string | null;
   image: string | null;
   creatorId: string;
+  isCreator: boolean;
   createdAt: string;
   creator: Author;
   members: {
@@ -54,6 +55,7 @@ type Community = {
 
 function CommunityDetailContent() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const communityId = params.id;
 
   const [community, setCommunity] = useState<Community | null>(null);
@@ -67,6 +69,14 @@ function CommunityDetailContent() {
 
   const [postContent, setPostContent] = useState("");
   const [error, setError] = useState("");
+
+  // EDIT COMMUNITY
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editImage, setEditImage] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingCommunity, setDeletingCommunity] = useState(false);
 
   // COMMENTS
   const [openComments, setOpenComments] = useState<string[]>([]);
@@ -192,6 +202,101 @@ function CommunityDetailContent() {
       ignore = true;
     };
   }, [communityId]);
+
+  // OPEN EDIT MODAL
+  function handleOpenEdit() {
+    if (!community) return;
+
+    setEditName(community.name);
+    setEditDescription(community.description || "");
+    setEditImage(community.image || "");
+    setShowEditModal(true);
+    setError("");
+  }
+
+  // UPDATE COMMUNITY
+  async function handleUpdateCommunity(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!community || !editName.trim()) return;
+
+    setSavingEdit(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: editName.trim(),
+            description: editDescription.trim(),
+            image: editImage.trim(),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to update community."
+        );
+      }
+
+      setShowEditModal(false);
+      await loadCommunity();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update community."
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // DELETE COMMUNITY
+  async function handleDeleteCommunity() {
+    if (!community || deletingCommunity) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${community.name}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingCommunity(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to delete community."
+        );
+      }
+
+      router.push("/communities");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete community."
+      );
+      setDeletingCommunity(false);
+    }
+  }
 
   // JOIN / LEAVE COMMUNITY
   async function handleMembership() {
@@ -587,6 +692,27 @@ function CommunityDetailContent() {
               </strong>
             </p>
 
+            {community.isCreator && (
+              <div className="detail-owner-actions">
+                <button
+                  type="button"
+                  className="detail-edit-community-btn"
+                  onClick={handleOpenEdit}
+                >
+                  ✏️ Edit Community
+                </button>
+
+                <button
+                  type="button"
+                  className="detail-delete-community-btn"
+                  onClick={handleDeleteCommunity}
+                  disabled={deletingCommunity}
+                >
+                  {deletingCommunity ? "Deleting..." : "🗑 Delete Community"}
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               className={
@@ -603,6 +729,94 @@ function CommunityDetailContent() {
             </button>
           </div>
         </section>
+
+        {/* EDIT COMMUNITY MODAL */}
+        {showEditModal && (
+          <div
+            className="detail-edit-overlay"
+            onClick={() => setShowEditModal(false)}
+          >
+            <div
+              className="detail-edit-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="detail-edit-modal-header">
+                <div>
+                  <p className="detail-subtitle">COMMUNITY SETTINGS</p>
+                  <h2>Edit Community</h2>
+                </div>
+
+                <button
+                  type="button"
+                  className="detail-edit-close"
+                  onClick={() => setShowEditModal(false)}
+                  aria-label="Close edit modal"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateCommunity}>
+                <label htmlFor="edit-community-name">
+                  Community Name
+                </label>
+                <input
+                  id="edit-community-name"
+                  type="text"
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  minLength={3}
+                  maxLength={50}
+                  required
+                />
+
+                <label htmlFor="edit-community-description">
+                  Description
+                </label>
+                <textarea
+                  id="edit-community-description"
+                  value={editDescription}
+                  onChange={(event) =>
+                    setEditDescription(event.target.value)
+                  }
+                  rows={4}
+                  maxLength={500}
+                  placeholder="Describe your community..."
+                />
+
+                <label htmlFor="edit-community-image">
+                  Image URL
+                </label>
+                <input
+                  id="edit-community-image"
+                  type="url"
+                  value={editImage}
+                  onChange={(event) => setEditImage(event.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
+
+                <div className="detail-edit-modal-actions">
+                  <button
+                    type="button"
+                    className="detail-edit-cancel-btn"
+                    onClick={() => setShowEditModal(false)}
+                    disabled={savingEdit}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="detail-edit-save-btn"
+                    disabled={savingEdit || !editName.trim()}
+                  >
+                    {savingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* COMMUNITY POSTS */}
         <section className="detail-posts-section">

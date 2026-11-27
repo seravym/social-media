@@ -78,6 +78,12 @@ export async function GET(
 
     const formattedCommunity = {
       ...community,
+
+      // Cek apakah user yang login adalah creator komunitas
+      isCreator: Boolean(
+        userId && community.creatorId === userId
+      ),
+
       posts: community.posts.map((post) => ({
         ...post,
         isLiked: post.likes.length > 0,
@@ -87,6 +93,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      currentUserId: userId,
       data: formattedCommunity,
     });
   } catch (error) {
@@ -136,7 +143,10 @@ export async function PUT(
 
     if (existingCommunity.creatorId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Only the creator can edit this community" },
+        {
+          success: false,
+          message: "Only the creator can edit this community",
+        },
         { status: 403 }
       );
     }
@@ -153,7 +163,10 @@ export async function PUT(
 
     if (name.trim().length < 3) {
       return NextResponse.json(
-        { success: false, message: "Community name must be at least 3 characters" },
+        {
+          success: false,
+          message: "Community name must be at least 3 characters",
+        },
         { status: 400 }
       );
     }
@@ -237,7 +250,10 @@ export async function DELETE(
 
     if (community.creatorId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Only the creator can delete this community" },
+        {
+          success: false,
+          message: "Only the creator can delete this community",
+        },
         { status: 403 }
       );
     }
