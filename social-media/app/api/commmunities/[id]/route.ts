@@ -3,9 +3,29 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const communities = await prisma.community.findMany({
+    const { id } = await params;
+    const communityId = Number(id);
+    const userId = await getSessionUserId();
+
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid community ID",
+        },
+        { status: 400 }
+      );
+    }
+
+    const community = await prisma.community.findUnique({
+      where: {
+        id: communityId,
+      },
       include: {
         creator: {
           select: {
@@ -15,101 +35,79 @@ export async function GET() {
             avatarUrl: true,
           },
         },
+        members: {
+          select: {
+            userId: true,
+          },
+        },
         _count: {
           select: {
             members: true,
+            posts: true,
+          },
+        },
+        posts: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatarUrl: true,
+              },
+            },
+            likes: {
+              where: {
+                userId: userId ?? "",
+              },
+              select: {
+                userId: true,
+              },
+            },
+            _count: {
+              select: {
+                comments: true,
+                likes: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
     });
+
+    if (!community) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Community not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    const formattedCommunity = {
+      ...community,
+      posts: community.posts.map((post) => ({
+        ...post,
+        isLiked: post.likes.length > 0,
+        likes: undefined,
+      })),
+    };
 
     return NextResponse.json({
       success: true,
-      data: communities,
+      data: formattedCommunity,
     });
   } catch (error) {
-    console.error("GET Communities Error:", error);
+    console.error("GET Community Detail Error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to fetch communities",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const creatorId = await getSessionUserId();
-
-    if (!creatorId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Please login first",
-        },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-    const { name, description, image } = body;
-
-    if (typeof name !== "string" || !name.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Community name is required",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (name.trim().length < 3) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Community name must be at least 3 characters",
-        },
-        { status: 400 }
-      );
-    }
-
-    const community = await prisma.community.create({
-      data: {
-        name: name.trim(),
-        description:
-          typeof description === "string" && description.trim()
-            ? description.trim()
-            : null,
-        image:
-          typeof image === "string" && image.trim()
-            ? image.trim()
-            : null,
-        creatorId,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Community created successfully",
-        data: community,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("POST Community Error:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to create community",
+        message: "Failed to fetch community details",
       },
       { status: 500 }
     );
