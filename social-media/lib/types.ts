@@ -42,6 +42,12 @@ export interface ConversationListResponse {
   items: ConversationDto[];
 }
 
+export interface ConversationMessagesResponse {
+  currentUserId: string;
+  messages: ChatMessageDto[];
+  hasMore: boolean;
+}
+
 export interface ConversationDetailDto {
   id: string;
   currentUserId: string;
