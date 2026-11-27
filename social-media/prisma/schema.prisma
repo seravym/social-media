@@ -74,6 +74,7 @@ model Community {
 
   creator User @relation(fields: [creatorId], references: [id])
   members CommunityMember[]
+  posts   Post[]
 }
 
 // COMMUNITY MEMBERS
@@ -353,18 +354,21 @@ model OtpCode {
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  authorId  String
-  content   String
-  views     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  authorId    String
+  communityId Int?
+  content     String
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  author   User          @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  comments PostComment[]
-  likes    PostLike[]
+  author    User      @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  community Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  comments  PostComment[]
+  likes     PostLike[]
 
   @@index([authorId, createdAt])
+  @@index([communityId, createdAt])
 }
 
 model PostComment {

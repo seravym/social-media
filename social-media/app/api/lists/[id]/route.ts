@@ -1,17 +1,33 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
 
-// GET: Mengambil detail list
+async function getCurrentUserId() {
+  return (
+    (await getSessionUserId()) ||
+    process.env.NEXT_PUBLIC_TEST_USER_ID ||
+    null
+  );
+}
+
 export async function GET(
   request: NextRequest,
   { params }: Context
 ) {
   try {
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const listId = Number(id);
 
@@ -58,6 +74,17 @@ export async function GET(
       );
     }
 
+    const isMember = list.members.some(
+      (member) => member.userId === userId
+    );
+
+    if (list.isPrivate && list.ownerId !== userId && !isMember) {
+      return NextResponse.json(
+        { success: false, message: "You are not allowed to view this list" },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       data: list,
@@ -72,24 +99,32 @@ export async function GET(
   }
 }
 
-// PUT: Mengedit list
 export async function PUT(
   request: NextRequest,
   { params }: Context
 ) {
   try {
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const listId = Number(id);
-    const body = await request.json();
 
-    const { name, description, isPrivate, ownerId } = body;
-
-    if (!Number.isInteger(listId) || listId <= 0 || !ownerId) {
+    if (!Number.isInteger(listId) || listId <= 0) {
       return NextResponse.json(
-        { success: false, message: "Invalid list ID or owner ID" },
+        { success: false, message: "Invalid list ID" },
         { status: 400 }
       );
     }
+
+    const body = await request.json();
+    const { name, description, isPrivate } = body;
 
     const existingList = await prisma.list.findUnique({
       where: { id: listId },
@@ -102,17 +137,24 @@ export async function PUT(
       );
     }
 
-    if (existingList.ownerId !== ownerId) {
+    if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { success: false, message: "You are not allowed to edit this list" },
         { status: 403 }
       );
     }
 
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      return NextResponse.json(
+        { success: false, message: "List name is required" },
+        { status: 400 }
+      );
+    }
+
     const updatedList = await prisma.list.update({
       where: { id: listId },
       data: {
-        ...(name !== undefined && { name }),
+        ...(name !== undefined && { name: name.trim() }),
         ...(description !== undefined && { description }),
         ...(isPrivate !== undefined && { isPrivate }),
       },
@@ -133,19 +175,26 @@ export async function PUT(
   }
 }
 
-// DELETE: Menghapus list
 export async function DELETE(
   request: NextRequest,
   { params }: Context
 ) {
   try {
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const listId = Number(id);
-    const ownerId = request.nextUrl.searchParams.get("ownerId");
 
-    if (!Number.isInteger(listId) || listId <= 0 || !ownerId) {
+    if (!Number.isInteger(listId) || listId <= 0) {
       return NextResponse.json(
-        { success: false, message: "Invalid list ID or owner ID" },
+        { success: false, message: "Invalid list ID" },
         { status: 400 }
       );
     }
@@ -161,7 +210,7 @@ export async function DELETE(
       );
     }
 
-    if (existingList.ownerId !== ownerId) {
+    if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { success: false, message: "You are not allowed to delete this list" },
         { status: 403 }
