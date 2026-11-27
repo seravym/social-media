@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Suspense, useEffect, useState, FormEvent } from "react";
@@ -19,6 +18,7 @@ type Post = {
   views: number;
   createdAt: string;
   author: Author;
+  isLiked: boolean;
   _count: {
     comments: number;
     likes: number;
@@ -52,6 +52,7 @@ function CommunityDetailContent() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [likingPosts, setLikingPosts] = useState<string[]>([]);
   const [postContent, setPostContent] = useState("");
   const [error, setError] = useState("");
 
@@ -208,8 +209,6 @@ function CommunityDetailContent() {
       }
 
       setPostContent("");
-
-      // Muat ulang detail agar post terbaru dan jumlah post ter-update.
       await loadCommunity();
     } catch (err) {
       setError(
@@ -217,6 +216,64 @@ function CommunityDetailContent() {
       );
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function handleLike(postId: string) {
+    if (likingPosts.includes(postId)) return;
+
+    setLikingPosts((previous) => [...previous, postId]);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || result.error || "Failed to update like."
+        );
+      }
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((post) => {
+            if (post.id !== postId) return post;
+
+            return {
+              ...post,
+              isLiked: result.liked,
+              _count: {
+                ...post._count,
+                likes: Math.max(
+                  0,
+                  post._count.likes + (result.liked ? 1 : -1)
+                ),
+              },
+            };
+          }),
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setLikingPosts((previous) =>
+        previous.filter((id) => id !== postId)
+      );
     }
   }
 
@@ -382,8 +439,21 @@ function CommunityDetailContent() {
 
                   <div className="detail-post-footer">
                     <span>{formatDate(post.createdAt)}</span>
+
+                    <button
+                      type="button"
+                      className={`detail-action-btn ${
+                        post.isLiked ? "liked" : ""
+                      }`}
+                      onClick={() => handleLike(post.id)}
+                      disabled={likingPosts.includes(post.id)}
+                      aria-label={post.isLiked ? "Unlike post" : "Like post"}
+                    >
+                      <span>{post.isLiked ? "❤️" : "♡"}</span>
+                      <span>{post._count.likes}</span>
+                    </button>
+
                     <span>💬 {post._count.comments}</span>
-                    <span>❤️ {post._count.likes}</span>
                     <span>👁 {post.views}</span>
                   </div>
                 </article>

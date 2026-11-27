@@ -374,3 +374,33 @@
 .detail-join-notice p {
   margin: 0;
 }
+
+
+.detail-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  color: #777;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.detail-action-btn:hover {
+  background: #fff0f5;
+  color: #e91e8c;
+}
+
+.detail-action-btn.liked {
+  color: #e91e63;
+  font-weight: 600;
+}
+
+.detail-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

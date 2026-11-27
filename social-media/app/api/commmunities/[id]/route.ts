@@ -1,10 +1,13 @@
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
 
+// GET COMMUNITY DETAIL + POSTS + LIKE STATUS
 export async function GET(
   request: Request,
   { params }: Context
@@ -12,6 +15,11 @@ export async function GET(
   try {
     const { id } = await params;
     const communityId = Number(id);
+
+    const userId =
+      (await getSessionUserId()) ||
+      process.env.NEXT_PUBLIC_TEST_USER_ID ||
+      "";
 
     if (!Number.isInteger(communityId) || communityId <= 0) {
       return NextResponse.json(
@@ -51,6 +59,14 @@ export async function GET(
                 avatarUrl: true,
               },
             },
+            likes: {
+              where: {
+                userId,
+              },
+              select: {
+                id: true,
+              },
+            },
             _count: {
               select: {
                 comments: true,
@@ -81,9 +97,21 @@ export async function GET(
       );
     }
 
+    const formattedCommunity = {
+      ...community,
+      posts: community.posts.map((post) => {
+        const { likes, ...postData } = post;
+
+        return {
+          ...postData,
+          isLiked: likes.length > 0,
+        };
+      }),
+    };
+
     return NextResponse.json({
       success: true,
-      data: community,
+      data: formattedCommunity,
     });
   } catch (error) {
     console.error("GET COMMUNITY DETAIL ERROR:", error);
@@ -98,6 +126,7 @@ export async function GET(
   }
 }
 
+// UPDATE COMMUNITY
 export async function PUT(
   request: Request,
   { params }: Context
@@ -164,6 +193,7 @@ export async function PUT(
   }
 }
 
+// DELETE COMMUNITY
 export async function DELETE(
   request: Request,
   { params }: Context
