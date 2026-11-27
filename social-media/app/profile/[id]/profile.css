@@ -33,8 +33,9 @@
 /* Blok Dusty Pink lebar penuh */
 .profile-information {
   width: 75%;
+  min-height: 350px;
   height: 300px;
-  background-color: #cfaab2;
+  background-color:#cfaab2 ;
   padding: 0 36px 28px;
 }
 
@@ -47,11 +48,11 @@
 
 /* Avatar bulat pas di garis batas banner & kotak pink */
 .profile-picture {
-  width: 150px;
-  height: 150px;
-  margin-top: 10px;
+  width: 200px;
+  height: 200px;
+  margin-top: -30px;
   border-radius: 50%;
-  border: 4px solid #903b4e;
+  border: 5px solid #903b4e;
   background-color: #e9d8dc;
   display: flex;
   align-items: center;
@@ -60,6 +61,7 @@
   font-weight: 600;
   color: #4a3b40;
   flex-shrink: 0;
+  position: relative;
 }
 
 .profile-picture img {
@@ -107,15 +109,15 @@
 }
 
 .profile-actions button:hover {
-  background-color: #faf5f6;
+  background-color: #EFD47A;
 }
 
 .profile-details {
-  margin-top: 8px;
+  margin-top: 20px;
 }
 
 .profile-details h2 {
-  margin: 0;
+  margin: 0px;
   font-size: 38px;
   font-weight: 800;
   line-height: 1.15;
