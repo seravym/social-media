@@ -8,41 +8,19 @@ datasource db {
 }
 
 model User {
-  id                    String               @id @default(cuid())
-  email                 String               @unique
-  name                  String?
-  username              String               @unique
-  avatarUrl             String?
-  createdAt             DateTime             @default(now())
-  articles              Article[]            @relation("ArticleAuthor")
-  articleBookmarks      ArticleBookmark[]
-  articleComments       ArticleComment[]     @relation("ArticleCommentAuthor")
-  articleLikes          ArticleLike[]
-  bookmarks             Bookmark[]
-  createdCommunities    Community[]
-  communityMemberships  CommunityMember[]
-  conversations         ConversationMember[]
-  createdLists          List[]               @relation("ListOwner")
-  listMemberships       ListMember[]
-  messages              Message[]
-  sentNotifications     Notification[]       @relation("SentNotifications")
-  receivedNotifications Notification[]       @relation("ReceivedNotifications")
-  userSettings UserSettings?
-}
-
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  username  String   @unique
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  passwordHash  String?
-  emailVerified DateTime?
-  otpCodes      OtpCode[]
-  bio       String?
-  phone     String?
-  birthDate DateTime?
-  settings UserSettings?
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  username        String           @unique
+  avatarUrl       String?
+  createdAt       DateTime         @default(now())
+  passwordHash    String?
+  emailVerified   DateTime?
+  otpCodes        OtpCode[]
+  bio             String?
+  phone           String?
+  birthDate       DateTime?
+  settings        UserSettings?
   mutedWords      MutedWord[]
   mutedAccounts   MutedAccount[]
   blockedAccounts BlockedAccount[]
@@ -65,8 +43,8 @@ model User {
   listMemberships ListMember[]
 
   // ARTICLES
-  articles         Article[]        @relation("ArticleAuthor")
-  articleComments  ArticleComment[] @relation("ArticleCommentAuthor")
+  articles         Article[]         @relation("ArticleAuthor")
+  articleComments  ArticleComment[]  @relation("ArticleCommentAuthor")
   articleLikes     ArticleLike[]
   articleBookmarks ArticleBookmark[]
 
@@ -93,6 +71,7 @@ model Community {
   createdAt   DateTime          @default(now())
   creator     User              @relation(fields: [creatorId], references: [id])
   members     CommunityMember[]
+  posts       Post[]
 }
 
 model CommunityMember {
@@ -297,7 +276,7 @@ model News {
   id        String   @id @default(cuid())
   title     String
   summary   String
-  category  String   // News | Sports | Entertainment
+  category  String // News | Sports | Entertainment
   postCount Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -325,16 +304,14 @@ model SearchHistory {
   @@index([userId, createdAt])
 }
 
-
 model Bookmark {
   id        Int      @id @default(autoincrement())
   postId    String
   userId    String
-  word      String
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@unique([postId, userId])
   @@index([userId, createdAt])
 }
 
@@ -359,8 +336,8 @@ model Post {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  author    User      @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  community Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  author    User          @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  community Community?    @relation(fields: [communityId], references: [id], onDelete: SetNull)
   comments  PostComment[]
   likes     PostLike[]
 
