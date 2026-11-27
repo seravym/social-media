@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (err) {
-    console.error(err);
+    console.error("SIGNUP ERROR:", err);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
   }
 }

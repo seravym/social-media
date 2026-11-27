@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     await createSession(user.id);
     return NextResponse.json({ message: "Verifikasi berhasil" });
   } catch (err) {
-    console.error(err);
+    console.error("VERIFY ERROR:", err);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
   }
 }
