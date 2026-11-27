@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Suspense, useEffect, useState, FormEvent } from "react";
@@ -12,6 +13,13 @@ type Author = {
   avatarUrl: string | null;
 };
 
+type Comment = {
+  id: string;
+  content: string;
+  createdAt: string;
+  user: Author;
+};
+
 type Post = {
   id: string;
   content: string;
@@ -19,6 +27,7 @@ type Post = {
   createdAt: string;
   author: Author;
   isLiked: boolean;
+  isBookmarked: boolean;
   _count: {
     comments: number;
     likes: number;
@@ -43,6 +52,8 @@ type Community = {
   };
 };
 
+const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID;
+
 function CommunityDetailContent() {
   const params = useParams<{ id: string }>();
   const communityId = params.id;
@@ -52,23 +63,64 @@ function CommunityDetailContent() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [posting, setPosting] = useState(false);
+
   const [likingPosts, setLikingPosts] = useState<string[]>([]);
+  const [bookmarkingPosts, setBookmarkingPosts] = useState<string[]>([]);
+
   const [postContent, setPostContent] = useState("");
   const [error, setError] = useState("");
 
-  async function loadCommunity() {
-    const response = await fetch(`/api/commmunities/${communityId}`);
-    const result = await response.json();
+  // COMMENTS
+  const [openComments, setOpenComments] = useState<string[]>([]);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentsLoaded, setCommentsLoaded] = useState<string[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState<string[]>([]);
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [sendingComments, setSendingComments] = useState<string[]>([]);
 
-    if (!response.ok || !result.success) {
+  // LOAD COMMUNITY AND BOOKMARKS
+  async function loadCommunity() {
+    const [communityResponse, bookmarksResponse] = await Promise.all([
+      fetch(`/api/commmunities/${communityId}`),
+      TEST_USER_ID
+        ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
+        : Promise.resolve(null),
+    ]);
+
+    const communityResult = await communityResponse.json();
+
+    if (!communityResponse.ok || !communityResult.success) {
       throw new Error(
-        result.message || result.error || "Failed to fetch community."
+        communityResult.message ||
+          communityResult.error ||
+          "Failed to fetch community."
       );
     }
 
-    setCommunity(result.data);
+    let bookmarkedIds: string[] = [];
+
+    if (bookmarksResponse) {
+      const bookmarksResult = await bookmarksResponse.json();
+
+      if (bookmarksResponse.ok && bookmarksResult.success) {
+        bookmarkedIds = bookmarksResult.data.map(
+          (bookmark: { id: string }) => bookmark.id
+        );
+      }
+    }
+
+    const formattedCommunity: Community = {
+      ...communityResult.data,
+      posts: communityResult.data.posts.map((post: Post) => ({
+        ...post,
+        isBookmarked: bookmarkedIds.includes(post.id),
+      })),
+    };
+
+    setCommunity(formattedCommunity);
   }
 
+  // INITIAL DATA
   useEffect(() => {
     let ignore = false;
 
@@ -77,10 +129,13 @@ function CommunityDetailContent() {
       setError("");
 
       try {
-        const [communityResponse, membershipResponse] =
+        const [communityResponse, membershipResponse, bookmarksResponse] =
           await Promise.all([
             fetch(`/api/commmunities/${communityId}`),
             fetch(`/api/commmunities/${communityId}/membership`),
+            TEST_USER_ID
+              ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
+              : Promise.resolve(null),
           ]);
 
         const communityResult = await communityResponse.json();
@@ -102,8 +157,28 @@ function CommunityDetailContent() {
           );
         }
 
+        let bookmarkedIds: string[] = [];
+
+        if (bookmarksResponse) {
+          const bookmarksResult = await bookmarksResponse.json();
+
+          if (bookmarksResponse.ok && bookmarksResult.success) {
+            bookmarkedIds = bookmarksResult.data.map(
+              (bookmark: { id: string }) => bookmark.id
+            );
+          }
+        }
+
         if (!ignore) {
-          setCommunity(communityResult.data);
+          const formattedCommunity: Community = {
+            ...communityResult.data,
+            posts: communityResult.data.posts.map((post: Post) => ({
+              ...post,
+              isBookmarked: bookmarkedIds.includes(post.id),
+            })),
+          };
+
+          setCommunity(formattedCommunity);
           setIsJoined(membershipResult.isMember);
         }
       } catch (err) {
@@ -119,13 +194,14 @@ function CommunityDetailContent() {
       }
     }
 
-    loadData();
+    void loadData();
 
     return () => {
       ignore = true;
     };
   }, [communityId]);
 
+  // JOIN / LEAVE COMMUNITY
   async function handleMembership() {
     if (!community) return;
 
@@ -141,7 +217,7 @@ function CommunityDetailContent() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+            userId: TEST_USER_ID,
           }),
         }
       );
@@ -179,6 +255,7 @@ function CommunityDetailContent() {
     }
   }
 
+  // CREATE POST
   async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -196,7 +273,7 @@ function CommunityDetailContent() {
         body: JSON.stringify({
           content: postContent.trim(),
           communityId: community.id,
-          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+          userId: TEST_USER_ID,
         }),
       });
 
@@ -219,8 +296,9 @@ function CommunityDetailContent() {
     }
   }
 
+  // LIKE / UNLIKE POST
   async function handleLike(postId: string) {
-    if (likingPosts.includes(postId)) return;
+    if (!TEST_USER_ID || likingPosts.includes(postId)) return;
 
     setLikingPosts((previous) => [...previous, postId]);
     setError("");
@@ -232,7 +310,7 @@ function CommunityDetailContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+          userId: TEST_USER_ID,
         }),
       });
 
@@ -277,6 +355,192 @@ function CommunityDetailContent() {
     }
   }
 
+  // SAVE / REMOVE BOOKMARK
+  async function handleBookmark(postId: string) {
+    if (!TEST_USER_ID || bookmarkingPosts.includes(postId)) return;
+
+    const post = community?.posts.find((item) => item.id === postId);
+    if (!post) return;
+
+    setBookmarkingPosts((previous) => [...previous, postId]);
+
+    try {
+      const response = post.isBookmarked
+        ? await fetch(
+            `/api/bookmarks?postId=${encodeURIComponent(postId)}&userId=${encodeURIComponent(TEST_USER_ID)}`,
+            { method: "DELETE" }
+          )
+        : await fetch("/api/bookmarks", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              postId,
+              userId: TEST_USER_ID,
+            }),
+          });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update bookmark."
+        );
+      }
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((item) =>
+            item.id === postId
+              ? { ...item, isBookmarked: !item.isBookmarked }
+              : item
+          ),
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save post."
+      );
+    } finally {
+      setBookmarkingPosts((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
+  // OPEN / CLOSE COMMENTS
+  async function handleToggleComments(postId: string) {
+    const isOpen = openComments.includes(postId);
+
+    if (isOpen) {
+      setOpenComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+      return;
+    }
+
+    setOpenComments((previous) => [...previous, postId]);
+
+    if (
+      commentsLoaded.includes(postId) ||
+      commentsLoading.includes(postId)
+    ) {
+      return;
+    }
+
+    setCommentsLoading((previous) => [...previous, postId]);
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch comments.");
+      }
+
+      setComments((previous) => ({
+        ...previous,
+        [postId]: result.comments || [],
+      }));
+
+      setCommentsLoaded((previous) => [...previous, postId]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch comments."
+      );
+
+      setOpenComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    } finally {
+      setCommentsLoading((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
+  // SEND COMMENT
+  async function handleSendComment(
+    event: FormEvent<HTMLFormElement>,
+    postId: string
+  ) {
+    event.preventDefault();
+
+    if (!TEST_USER_ID || sendingComments.includes(postId)) return;
+
+    const content = (commentInputs[postId] || "").trim();
+    if (!content) return;
+
+    setSendingComments((previous) => [...previous, postId]);
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content,
+          userId: TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.comment) {
+        throw new Error(result.error || "Failed to send comment.");
+      }
+
+      setComments((previous) => ({
+        ...previous,
+        [postId]: [
+          result.comment,
+          ...(previous[postId] || []),
+        ],
+      }));
+
+      setCommentsLoaded((previous) =>
+        previous.includes(postId) ? previous : [...previous, postId]
+      );
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  _count: {
+                    ...post._count,
+                    comments: post._count.comments + 1,
+                  },
+                }
+              : post
+          ),
+        };
+      });
+
+      setCommentInputs((previous) => ({
+        ...previous,
+        [postId]: "",
+      }));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to send comment."
+      );
+    } finally {
+      setSendingComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
   function formatDate(date: string) {
     return new Date(date).toLocaleString("id-ID", {
       dateStyle: "medium",
@@ -315,6 +579,7 @@ function CommunityDetailContent() {
 
         {error && <div className="detail-error">{error}</div>}
 
+        {/* COMMUNITY HEADER */}
         <section className="detail-community-header">
           <div className="detail-community-image">
             {community.image ? (
@@ -362,6 +627,7 @@ function CommunityDetailContent() {
           </div>
         </section>
 
+        {/* COMMUNITY POSTS */}
         <section className="detail-posts-section">
           <div className="detail-posts-heading">
             <h2>Community Posts</h2>
@@ -413,6 +679,7 @@ function CommunityDetailContent() {
             <div className="detail-post-list">
               {community.posts.map((post) => (
                 <article className="detail-post-card" key={post.id}>
+                  {/* AUTHOR */}
                   <div className="detail-post-author">
                     {post.author.avatarUrl ? (
                       <img
@@ -435,8 +702,10 @@ function CommunityDetailContent() {
                     </div>
                   </div>
 
+                  {/* CONTENT */}
                   <p className="detail-post-content">{post.content}</p>
 
+                  {/* POST ACTIONS */}
                   <div className="detail-post-footer">
                     <span>{formatDate(post.createdAt)}</span>
 
@@ -453,9 +722,116 @@ function CommunityDetailContent() {
                       <span>{post._count.likes}</span>
                     </button>
 
-                    <span>💬 {post._count.comments}</span>
+                    <button
+                      type="button"
+                      className="detail-action-btn"
+                      onClick={() => handleToggleComments(post.id)}
+                    >
+                      <span>💬</span>
+                      <span>{post._count.comments}</span>
+                    </button>
+
                     <span>👁 {post.views}</span>
+
+                    <button
+                      type="button"
+                      className={`detail-action-btn detail-save-btn ${
+                        post.isBookmarked ? "saved" : ""
+                      }`}
+                      onClick={() => handleBookmark(post.id)}
+                      disabled={bookmarkingPosts.includes(post.id)}
+                    >
+                      {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
+                    </button>
                   </div>
+
+                  {/* COMMENTS PANEL */}
+                  {openComments.includes(post.id) && (
+                    <div className="detail-comments">
+                      <h3>Comments</h3>
+
+                      {commentsLoading.includes(post.id) ? (
+                        <p className="detail-comments-empty">
+                          Loading comments...
+                        </p>
+                      ) : (comments[post.id] || []).length === 0 ? (
+                        <p className="detail-comments-empty">
+                          No comments yet. Be the first to comment!
+                        </p>
+                      ) : (
+                        <div className="detail-comments-list">
+                          {(comments[post.id] || []).map((comment) => (
+                            <div
+                              className="detail-comment"
+                              key={comment.id}
+                            >
+                              {comment.user.avatarUrl ? (
+                                <img
+                                  src={comment.user.avatarUrl}
+                                  alt={comment.user.username}
+                                  className="detail-comment-avatar"
+                                />
+                              ) : (
+                                <div className="detail-comment-avatar placeholder">
+                                  {(comment.user.name ||
+                                    comment.user.username)
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </div>
+                              )}
+
+                              <div className="detail-comment-body">
+                                <div className="detail-comment-author">
+                                  <strong>
+                                    {comment.user.name ||
+                                      comment.user.username}
+                                  </strong>
+                                  <span>@{comment.user.username}</span>
+                                </div>
+
+                                <p>{comment.content}</p>
+
+                                <small>
+                                  {formatDate(comment.createdAt)}
+                                </small>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <form
+                        className="detail-comment-form"
+                        onSubmit={(event) =>
+                          handleSendComment(event, post.id)
+                        }
+                      >
+                        <input
+                          type="text"
+                          placeholder="Write a comment..."
+                          value={commentInputs[post.id] || ""}
+                          onChange={(event) =>
+                            setCommentInputs((previous) => ({
+                              ...previous,
+                              [post.id]: event.target.value,
+                            }))
+                          }
+                        />
+
+                        <button
+                          type="submit"
+                          disabled={
+                            !(commentInputs[post.id] || "").trim() ||
+                            sendingComments.includes(post.id)
+                          }
+                        >
+                          {sendingComments.includes(post.id)
+                            ? "Sending..."
+                            : "Send"}
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
