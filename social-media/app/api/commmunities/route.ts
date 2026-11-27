@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -42,18 +41,40 @@ export async function GET() {
   }
 }
 
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { name, description, image, creatorId } = body;
+    const { name, description, image } = body;
 
-    if (!name || !creatorId) {
+    const creatorId =
+      body.creatorId || process.env.NEXT_PUBLIC_TEST_USER_ID;
+
+    if (!creatorId) {
       return NextResponse.json(
         {
           success: false,
-          message: "Name and creatorId are required",
+          message: "Creator ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof name !== "string" || !name.trim()) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Community name is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (name.trim().length < 3) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Community name must be at least 3 characters",
         },
         { status: 400 }
       );
@@ -61,9 +82,9 @@ export async function POST(request: Request) {
 
     const community = await prisma.community.create({
       data: {
-        name,
-        description,
-        image,
+        name: name.trim(),
+        description: description?.trim() || null,
+        image: image?.trim() || null,
         creatorId,
       },
     });

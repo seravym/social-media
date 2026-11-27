@@ -6,12 +6,20 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
+async function getCurrentUserId() {
+  return (
+    (await getSessionUserId()) ||
+    process.env.NEXT_PUBLIC_TEST_USER_ID ||
+    null
+  );
+}
+
 export async function GET(
   request: NextRequest,
   { params }: Context
 ) {
   try {
-    const userId = await getSessionUserId();
+    const userId = await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
@@ -96,7 +104,7 @@ export async function PUT(
   { params }: Context
 ) {
   try {
-    const userId = await getSessionUserId();
+    const userId = await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
@@ -172,7 +180,7 @@ export async function DELETE(
   { params }: Context
 ) {
   try {
-    const userId = await getSessionUserId();
+    const userId = await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
