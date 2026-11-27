@@ -20,6 +20,13 @@ type Comment = {
   user: Author;
 };
 
+type Member = {
+  id: number;
+  userId: string;
+  joinedAt: string;
+  user: Author;
+};
+
 type Post = {
   id: string;
   content: string;
@@ -78,6 +85,12 @@ function CommunityDetailContent() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingCommunity, setDeletingCommunity] = useState(false);
 
+  // MANAGE MEMBERS
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+
   // COMMENTS
   const [openComments, setOpenComments] = useState<string[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
@@ -123,6 +136,97 @@ function CommunityDetailContent() {
     };
 
     setCommunity(formattedCommunity);
+  }
+
+  // LOAD MEMBERS
+  async function loadMembers() {
+    setLoadingMembers(true);
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${communityId}/members`
+      );
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to fetch community members."
+        );
+      }
+
+      setMembers(result.data.members || []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch members."
+      );
+    } finally {
+      setLoadingMembers(false);
+    }
+  }
+
+  // OPEN MANAGE MEMBERS
+  async function handleOpenMembers() {
+    setShowMembersModal(true);
+    await loadMembers();
+  }
+
+  // REMOVE MEMBER
+  async function handleRemoveMember(member: Member) {
+    if (!community || removingMember) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove @${member.user.username} from ${community.name}?`
+    );
+
+    if (!confirmed) return;
+
+    setRemovingMember(member.userId);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}/members`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: member.userId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to remove member."
+        );
+      }
+
+      setMembers((previous) =>
+        previous.filter((item) => item.userId !== member.userId)
+      );
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          _count: {
+            ...previous._count,
+            members: Math.max(0, previous._count.members - 1),
+          },
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to remove member."
+      );
+    } finally {
+      setRemovingMember(null);
+    }
   }
 
   // INITIAL DATA
@@ -710,6 +814,14 @@ function CommunityDetailContent() {
                 >
                   {deletingCommunity ? "Deleting..." : "🗑 Delete Community"}
                 </button>
+
+                <button
+                  type="button"
+                  className="detail-manage-members-btn"
+                  onClick={handleOpenMembers}
+                >
+                  👥 Manage Members
+                </button>
               </div>
             )}
 
@@ -729,6 +841,100 @@ function CommunityDetailContent() {
             </button>
           </div>
         </section>
+
+        {/* MANAGE MEMBERS MODAL */}
+        {showMembersModal && (
+          <div
+            className="detail-members-overlay"
+            onClick={() => setShowMembersModal(false)}
+          >
+            <div
+              className="detail-members-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="detail-members-header">
+                <div>
+                  <p className="detail-subtitle">COMMUNITY SETTINGS</p>
+                  <h2>Manage Members</h2>
+                  <span>
+                    {members.length}{" "}
+                    {members.length === 1 ? "member" : "members"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="detail-edit-close"
+                  onClick={() => setShowMembersModal(false)}
+                  aria-label="Close members modal"
+                >
+                  ×
+                </button>
+              </div>
+
+              {loadingMembers ? (
+                <p className="detail-members-empty">Loading members...</p>
+              ) : members.length === 0 ? (
+                <div className="detail-members-empty">
+                  <span>👥</span>
+                  <h3>No members yet</h3>
+                  <p>When people join this community, they will appear here.</p>
+                </div>
+              ) : (
+                <div className="detail-members-list">
+                  {members.map((member) => (
+                    <div
+                      className="detail-member-item"
+                      key={member.userId}
+                    >
+                      <div className="detail-member-profile">
+                        {member.user.avatarUrl ? (
+                          <img
+                            src={member.user.avatarUrl}
+                            alt={member.user.username}
+                          />
+                        ) : (
+                          <div className="detail-member-avatar-placeholder">
+                            {(member.user.name || member.user.username)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className="detail-member-info">
+                          <strong>
+                            {member.user.name || member.user.username}
+                          </strong>
+                          <span>@{member.user.username}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="detail-remove-member-btn"
+                        onClick={() => handleRemoveMember(member)}
+                        disabled={removingMember === member.userId}
+                      >
+                        {removingMember === member.userId
+                          ? "Removing..."
+                          : "Remove"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="detail-members-footer">
+                <button
+                  type="button"
+                  onClick={() => setShowMembersModal(false)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* EDIT COMMUNITY MODAL */}
         {showEditModal && (
@@ -870,7 +1076,6 @@ function CommunityDetailContent() {
             <div className="detail-post-list">
               {community.posts.map((post) => (
                 <article className="detail-post-card" key={post.id}>
-                  {/* AUTHOR */}
                   <div className="detail-post-author">
                     {post.author.avatarUrl ? (
                       <img
@@ -893,10 +1098,8 @@ function CommunityDetailContent() {
                     </div>
                   </div>
 
-                  {/* CONTENT */}
                   <p className="detail-post-content">{post.content}</p>
 
-                  {/* POST ACTIONS */}
                   <div className="detail-post-footer">
                     <span>{formatDate(post.createdAt)}</span>
 
@@ -936,7 +1139,6 @@ function CommunityDetailContent() {
                     </button>
                   </div>
 
-                  {/* COMMENTS PANEL */}
                   {openComments.includes(post.id) && (
                     <div className="detail-comments">
                       <h3>Comments</h3>
