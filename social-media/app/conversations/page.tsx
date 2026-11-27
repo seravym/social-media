@@ -1,15 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ConversationDto } from "@/lib/types";
-import { MessageAreaSkeleton } from "@/components/conversations/ChatSkeletons";
+import type {
+  ChatMessageDto,
+  ConversationDetailDto,
+  ConversationDto,
+} from "@/lib/types";
 import { ChatSidebar } from "@/components/conversations/ChatSidebar";
+import { ChatWindow } from "@/components/conversations/ChatWindow";
+
+const SELF_NOTES_KEY = "social_media_self_notes_v1";
 
 export default function ConversationsPage() {
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ConversationDetailDto | null>(null);
+  const [selfMessages, setSelfMessages] = useState<ChatMessageDto[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem(SELF_NOTES_KEY);
+      return saved ? (JSON.parse(saved) as ChatMessageDto[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [replyDraft, setReplyDraft] = useState("");
+  const [vanishMode, setVanishMode] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingChat, setLoadingChat] = useState(false);
 
@@ -28,12 +47,34 @@ export default function ConversationsPage() {
     loadConversations();
   }, []);
 
-  const selectedChat = conversations.find((c) => c.id === selectedId) ?? null;
+  const loadDetail = async (id: string) => {
+    setLoadingChat(true);
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as ConversationDetailDto;
+      setDetail(data);
+      await fetch(`/api/conversations/${id}/read`, { method: "POST" });
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+      );
+    } finally {
+      setLoadingChat(false);
+    }
+  };
 
   const handleSelectChat = (id: string) => {
     setSelectedId(id);
-    setLoadingChat(true);
-    setTimeout(() => setLoadingChat(false), 180);
+    setShowSettings(false);
+    setShowMedia(false);
+    if (id === "self-notes") {
+      setDetail(null);
+      setLoadingChat(false);
+      return;
+    }
+    loadDetail(id);
   };
 
   const handleStartChat = async (userId: string) => {
@@ -61,13 +102,60 @@ export default function ConversationsPage() {
     handleSelectChat(conversationId);
   };
 
+  const handleSendMessage = async (body: string, imageUrl: string | null) => {
+    if (!selectedId) return;
+
+    if (selectedId === "self-notes") {
+      const newNote: ChatMessageDto = {
+        id: `note_${Date.now()}`,
+        senderId: "self",
+        body,
+        imageUrl,
+        createdAt: new Date().toISOString(),
+      };
+      setSelfMessages((prev) => {
+        const next = [...prev, newNote];
+        try {
+          localStorage.setItem(SELF_NOTES_KEY, JSON.stringify(next));
+        } catch {
+          return next;
+        }
+        return next;
+      });
+      return;
+    }
+
+    const res = await fetch(`/api/conversations/${selectedId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body, imageUrl }),
+    });
+    if (!res.ok) return;
+    const created = (await res.json()) as ChatMessageDto;
+    setDetail((prev) =>
+      prev ? { ...prev, messages: [...prev.messages, created] } : prev
+    );
+    await loadConversations();
+  };
+
+  const selectedChat = conversations.find((c) => c.id === selectedId) ?? null;
   const isSelfNotes = selectedId === "self-notes";
+  const currentUserId =
+    detail?.members.find((m) => m.user.id !== detail.other?.id)?.user.id ?? "";
+
   const activeName = isSelfNotes
     ? "Catatan Pribadi"
-    : selectedChat?.nickname || selectedChat?.other?.displayName || "User";
+    : detail?.nickname ||
+      selectedChat?.nickname ||
+      detail?.other?.displayName ||
+      selectedChat?.other?.displayName ||
+      "User";
   const activeSubtitle = isSelfNotes
     ? "Ruang catatan pribadi Anda"
-    : `@${selectedChat?.other?.username || "user"}`;
+    : `@${detail?.other?.username || selectedChat?.other?.username || "user"}`;
+  const activeAvatar = isSelfNotes
+    ? null
+    : detail?.other?.avatarUrl ?? selectedChat?.other?.avatarUrl ?? null;
 
   return (
     <div className="min-h-dvh bg-slate-100 p-2 text-slate-900 sm:p-4">
@@ -86,7 +174,7 @@ export default function ConversationsPage() {
         <main
           className={`${
             selectedId ? "flex" : "hidden md:flex"
-          } flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}
+          } relative flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}
         >
           {!selectedId ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -101,36 +189,36 @@ export default function ConversationsPage() {
                 menulis.
               </p>
             </div>
-          ) : loadingChat ? (
-            <MessageAreaSkeleton />
           ) : (
-            <div className="flex flex-1 flex-col">
-              <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="rounded-full px-2.5 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 md:hidden"
-                >
-                  ← Back
-                </button>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-100 text-sm font-bold text-pink-600">
-                  {isSelfNotes ? "📝" : activeName.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {activeName}
-                  </p>
-                  <p className="text-xs text-slate-500">{activeSubtitle}</p>
-                </div>
-              </div>
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-slate-400">
-                <p>Ruang obrolan siap diisi di Commit 4.</p>
-                {replyDraft && (
-                  <p className="rounded-xl bg-pink-50 px-3 py-1.5 text-xs text-pink-600">
-                    Draft note: {replyDraft}
-                  </p>
-                )}
-              </div>
+            <ChatWindow
+              key={selectedId}
+              name={activeName}
+              subtitle={activeSubtitle}
+              avatarUrl={activeAvatar}
+              currentUserId={currentUserId}
+              isSelfNotes={isSelfNotes}
+              loading={loadingChat}
+              messages={isSelfNotes ? selfMessages : detail?.messages ?? []}
+              background={
+                isSelfNotes
+                  ? null
+                  : detail?.background ?? selectedChat?.background ?? null
+              }
+              vanishMode={vanishMode}
+              initialDraft={replyDraft}
+              onClearInitialDraft={() => setReplyDraft("")}
+              onBack={() => setSelectedId(null)}
+              onSendMessage={handleSendMessage}
+              onOpenMedia={() => setShowMedia((prev) => !prev)}
+              onOpenSettings={() => setShowSettings((prev) => !prev)}
+            />
+          )}
+
+          {(showSettings || showMedia) && (
+            <div className="border-t border-slate-100 bg-white px-4 py-2 text-xs text-slate-500">
+              {showSettings
+                ? "Drawer Pengaturan Chat akan ditambahkan di Commit 5."
+                : "Drawer Galeri Bersama akan ditambahkan di Commit 5."}
             </div>
           )}
         </main>
