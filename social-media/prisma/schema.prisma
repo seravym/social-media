@@ -23,6 +23,10 @@ model User {
   phone     String?
   birthDate DateTime?
   settings UserSettings?
+  mutedWords      MutedWord[]
+  mutedAccounts   MutedAccount[]
+  blockedAccounts BlockedAccount[]
+  searchHistory   SearchHistory[]
 
   // NOTIFICATION
   receivedNotifications Notification[] @relation("ReceivedNotifications")
@@ -176,7 +180,6 @@ model Message {
   @@index([conversationId, createdAt])
 }
 
-// ARTICLES
 model Article {
   id            String   @id @default(cuid())
   authorId      String
@@ -257,6 +260,71 @@ model UserSettings {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MutedWord {
+  id        String   @id @default(cuid())
+  userId    String
+  word      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model MutedAccount {
+  id        String   @id @default(cuid())
+  userId    String
+  username  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, username])
+}
+
+model BlockedAccount {
+  id        String   @id @default(cuid())
+  userId    String
+  username  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, username])
+}
+
+model News {
+  id        String   @id @default(cuid())
+  title     String
+  summary   String
+  category  String   // News | Sports | Entertainment
+  postCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([category, createdAt])
+}
+
+model TrendingTopic {
+  id        String @id @default(cuid())
+  name      String @unique
+  category  String // News | Sports | Entertainment
+  postCount Int    @default(0)
+
+  @@index([category, postCount])
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, query])
+  @@index([userId, createdAt])
 }
 
 
