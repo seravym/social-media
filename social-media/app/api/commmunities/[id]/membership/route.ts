@@ -1,9 +1,67 @@
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
+
+function getUserId(request: Request) {
+  const url = new URL(request.url);
+  const userId =
+    url.searchParams.get("userId") ||
+    process.env.NEXT_PUBLIC_TEST_USER_ID;
+
+  return userId;
+}
+
+// CHECK MEMBERSHIP STATUS
+export async function GET(
+  request: Request,
+  { params }: Context
+) {
+  try {
+    const { id } = await params;
+    const communityId = Number(id);
+
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid community ID" },
+        { status: 400 }
+      );
+    }
+
+    const userId = getUserId(request);
+
+    if (!userId) {
+      return NextResponse.json(
+        { message: "User ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const membership = await prisma.communityMember.findUnique({
+      where: {
+        userId_communityId: {
+          userId,
+          communityId,
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      isMember: !!membership,
+    });
+  } catch (error) {
+    console.error("CHECK MEMBERSHIP ERROR:", error);
+
+    return NextResponse.json(
+      { message: "Failed to check membership" },
+      { status: 500 }
+    );
+  }
+}
 
 async function getMembershipData(
   request: Request,
