@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 type Article = {
@@ -32,14 +31,14 @@ const MAX_COMMENT = 500;
 const readTime = (text: string) =>
     Math.max(1, Math.ceil(text.trim().split(/\s+/).length / 200));
 
-    const formatDate = (iso: string) =>
+const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("id-ID", {
         day: "numeric",
         month: "short",
         year: "numeric",
     });
 
-    export default function ArticleDetailPage() {
+function ArticleDetail() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
 
@@ -144,17 +143,17 @@ const readTime = (text: string) =>
     }
 
     return (
-        <main className="mx-auto max-w-2xl px-4 py-6">
+        <main className="mx-auto w-full max-w-4xl px-6 py-8">
         <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
             <Link href="/articles" aria-label="Kembali" className="text-xl">
                 ←
             </Link>
-            <h1 className="text-xl font-bold text-pink-600">Articles</h1>
+            <h1 className="text-2xl font-bold text-pink-600">Articles</h1>
             </div>
             <Link
             href="/articles/new"
-            className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700"
+            className="rounded-full bg-pink-600 px-4 py-2 text-base font-semibold text-white hover:bg-pink-700"
             >
             New Articles
             </Link>
@@ -171,18 +170,18 @@ const readTime = (text: string) =>
         {status === "ok" && article && (
             <article>
             <div className="flex h-48 items-end rounded-xl bg-gradient-to-br from-pink-500 to-rose-700 p-3">
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold">
                 {article.category}
                 </span>
             </div>
 
-            <h2 className="mt-4 text-2xl font-bold">{article.title}</h2>
-            <p className="mt-2 text-sm text-gray-500">
+            <h2 className="mt-4 text-3xl font-bold">{article.title}</h2>
+            <p className="mt-2 text-base text-gray-500">
                 {article.author.name ?? article.author.username} @{article.author.username} ·{" "}
                 {formatDate(article.createdAt)} · {readTime(article.content)} mnt baca
             </p>
 
-            <div className="mt-4 space-y-4 text-sm leading-relaxed">
+            <div className="mt-4 space-y-4 text-base leading-relaxed">
                 {article.content.split(/\n\s*\n/).map((p, i) => (
                 <p key={i} className="whitespace-pre-line">
                     {p}
@@ -191,7 +190,7 @@ const readTime = (text: string) =>
             </div>
 
             {/* aksi: suka, komentar, tayangan, simpan, hapus */}
-            <div className="mt-6 flex items-center gap-5 border-t border-gray-200 pt-3 text-sm text-gray-500">
+            <div className="mt-6 flex items-center gap-5 border-t border-gray-200 pt-3 text-base text-gray-500">
                 <button
                 onClick={toggleLike}
                 className={article.liked ? "font-semibold text-pink-600" : "hover:text-pink-600"}
@@ -226,41 +225,41 @@ const readTime = (text: string) =>
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
                 placeholder="Tulis komentar Anda"
-                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                 />
                 <div className="mt-1 flex items-center justify-between">
                 <span
-                    className={`text-xs ${text.length > MAX_COMMENT ? "text-red-600" : "text-gray-500"}`}
+                    className={`text-sm ${text.length > MAX_COMMENT ? "text-red-600" : "text-gray-500"}`}
                 >
                     {text.length}/{MAX_COMMENT}
                 </span>
                 <button
                     onClick={submitComment}
                     disabled={posting}
-                    className="rounded-full bg-pink-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
+                    className="rounded-full bg-pink-600 px-4 py-1.5 text-base font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
                 >
                     {posting ? "Mengirim..." : "Kirim"}
                 </button>
                 </div>
-                {commentError && <p className="mt-1 text-sm text-red-600">{commentError}</p>}
+                {commentError && <p className="mt-1 text-base text-red-600">{commentError}</p>}
 
                 {comments.length === 0 ? (
-                <p className="mt-4 text-sm text-gray-500">Belum ada komentar. Jadilah yang pertama.</p>
+                <p className="mt-4 text-base text-gray-500">Belum ada komentar. Jadilah yang pertama.</p>
                 ) : (
                 <ul className="mt-4 space-y-4">
                     {comments.map((c) => (
                     <li key={c.id} className="border-b border-gray-100 pb-3">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm text-gray-500">
                         <span className="font-semibold text-gray-800">
                             {c.author?.name ?? c.author?.username ?? "Pengguna"}
                         </span>{" "}
                         @{c.author?.username ?? "-"} · {formatDate(c.createdAt)}
                         </p>
-                        <p className="mt-1 whitespace-pre-line text-sm">{c.content}</p>
+                        <p className="mt-1 whitespace-pre-line text-base">{c.content}</p>
                         {c.isOwner && (
                         <button
                             onClick={() => deleteComment(c.id)}
-                            className="mt-1 text-xs text-red-600 hover:underline"
+                            className="mt-1 text-sm text-red-600 hover:underline"
                         >
                             Hapus
                         </button>
@@ -273,5 +272,12 @@ const readTime = (text: string) =>
             </article>
         )}
         </main>
+    );
+}
+export default function ArticleDetailPage() {
+    return (
+        <Suspense fallback={<p className="py-8 text-center text-gray-500">Memuat...</p>}>
+        <ArticleDetail />
+        </Suspense>
     );
 }
