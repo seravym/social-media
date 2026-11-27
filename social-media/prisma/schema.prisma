@@ -27,6 +27,7 @@ model User {
   mutedAccounts   MutedAccount[]
   blockedAccounts BlockedAccount[]
   searchHistory   SearchHistory[]
+  explorePosts ExplorePost[]
 
   // NOTIFICATION
   receivedNotifications Notification[] @relation("ReceivedNotifications")
@@ -410,4 +411,20 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model ExplorePost {
+  id         String   @id @default(cuid())
+  content    String
+  category   String   // News | Sports | Entertainment
+  replyCount Int      @default(0)
+  likeCount  Int      @default(0)
+  views      Int      @default(0)
+  authorId   String
+  createdAt  DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([category, likeCount])
+  @@index([authorId])
 }
