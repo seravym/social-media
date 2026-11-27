@@ -445,3 +445,42 @@
     padding: 0 13px;
   }
 }
+
+
+/* CREATE COMMUNITY BUTTON */
+
+.communities-home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.communities-home-header .create-community-btn {
+  flex-shrink: 0;
+  padding: 11px 20px;
+  border: none;
+  border-radius: 24px;
+  background: #e84b9b;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.communities-home-header .create-community-btn:hover {
+  background: #d94691;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+  .communities-home-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .communities-home-header .create-community-btn {
+    width: 100%;
+  }
+}

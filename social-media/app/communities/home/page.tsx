@@ -1,4 +1,3 @@
-
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -56,58 +55,68 @@ export default function CommunitiesHomePage() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [sendingComments, setSendingComments] = useState<string[]>([]);
 
-  useEffect(() => {
-    async function fetchPosts() {
-      try {
-        const [postsResponse, bookmarksResponse] = await Promise.all([
-          fetch("/api/commmunities/home"),
-          TEST_USER_ID
-            ? fetch(
-                `/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`
-              )
-            : Promise.resolve(null),
-        ]);
+  // CREATE COMMUNITY
+  const [showModal, setShowModal] = useState(false);
+  const [communityName, setCommunityName] = useState("");
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-        const postsResult = await postsResponse.json();
+  async function fetchPosts() {
+    try {
+      const [postsResponse, bookmarksResponse] = await Promise.all([
+        fetch("/api/commmunities/home"),
+        TEST_USER_ID
+          ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
+          : Promise.resolve(null),
+      ]);
 
-        if (!postsResponse.ok || !postsResult.success) {
-          throw new Error(
-            postsResult.error ||
-              postsResult.message ||
-              "Gagal mengambil postingan"
+      const postsResult = await postsResponse.json();
+
+      if (!postsResponse.ok || !postsResult.success) {
+        throw new Error(
+          postsResult.error ||
+            postsResult.message ||
+            "Gagal mengambil postingan"
+        );
+      }
+
+      let bookmarkedIds: string[] = [];
+
+      if (bookmarksResponse) {
+        const bookmarksResult = await bookmarksResponse.json();
+
+        if (bookmarksResponse.ok && bookmarksResult.success) {
+          bookmarkedIds = bookmarksResult.data.map(
+            (bookmark: { id: string }) => bookmark.id
           );
         }
-
-        let bookmarkedIds: string[] = [];
-
-        if (bookmarksResponse) {
-          const bookmarksResult = await bookmarksResponse.json();
-
-          if (bookmarksResponse.ok && bookmarksResult.success) {
-            bookmarkedIds = bookmarksResult.data.map(
-              (bookmark: { id: string }) => bookmark.id
-            );
-          }
-        }
-
-        const formattedPosts: Post[] = postsResult.data.map(
-          (post: Post) => ({
-            ...post,
-            isBookmarked: bookmarkedIds.includes(post.id),
-          })
-        );
-
-        setPosts(formattedPosts);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Terjadi kesalahan"
-        );
-      } finally {
-        setLoading(false);
       }
-    }
 
-    void fetchPosts();
+      const formattedPosts: Post[] = postsResult.data.map(
+        (post: Post) => ({
+          ...post,
+          isBookmarked: bookmarkedIds.includes(post.id),
+        })
+      );
+
+      setPosts(formattedPosts);
+      setError("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Terjadi kesalahan"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // FETCH POSTS
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      void fetchPosts();
+    });
   }, []);
 
   function formatDate(date: string) {
@@ -120,6 +129,7 @@ export default function CommunitiesHomePage() {
     });
   }
 
+  // LIKE POST
   async function handleLike(postId: string) {
     if (!TEST_USER_ID || likingPosts.includes(postId)) return;
 
@@ -131,9 +141,7 @@ export default function CommunitiesHomePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          userId: TEST_USER_ID,
-        }),
+        body: JSON.stringify({ userId: TEST_USER_ID }),
       });
 
       const result = await response.json();
@@ -172,6 +180,7 @@ export default function CommunitiesHomePage() {
     }
   }
 
+  // BOOKMARK POST
   async function handleBookmark(postId: string) {
     if (!TEST_USER_ID || bookmarkingPosts.includes(postId)) return;
 
@@ -223,6 +232,7 @@ export default function CommunitiesHomePage() {
     }
   }
 
+  // TOGGLE COMMENTS
   async function handleToggleComments(postId: string) {
     const isOpen = openComments.includes(postId);
 
@@ -271,6 +281,7 @@ export default function CommunitiesHomePage() {
     }
   }
 
+  // SEND COMMENT
   async function handleSendComment(
     event: FormEvent<HTMLFormElement>,
     postId: string
@@ -280,7 +291,6 @@ export default function CommunitiesHomePage() {
     if (!TEST_USER_ID || sendingComments.includes(postId)) return;
 
     const content = (commentInputs[postId] || "").trim();
-
     if (!content) return;
 
     setSendingComments((current) => [...current, postId]);
@@ -344,9 +354,85 @@ export default function CommunitiesHomePage() {
     }
   }
 
+  // CLOSE CREATE COMMUNITY MODAL
+  function closeModal() {
+    if (submitting) return;
+
+    setShowModal(false);
+    setFormError("");
+  }
+
+  // CREATE COMMUNITY
+  async function handleCreateCommunity(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    const trimmedName = communityName.trim();
+
+    if (!trimmedName) {
+      setFormError("Community name cannot be empty.");
+      return;
+    }
+
+    if (trimmedName.length < 3) {
+      setFormError("Community name must be at least 3 characters.");
+      return;
+    }
+
+    if (!TEST_USER_ID) {
+      setFormError("Test user ID belum dikonfigurasi.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setFormError("");
+
+      const response = await fetch("/api/commmunities", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          description: description.trim(),
+          image: image.trim(),
+          creatorId: TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to create community"
+        );
+      }
+
+      setShowModal(false);
+      setCommunityName("");
+      setDescription("");
+      setImage("");
+      setFormError("");
+
+      alert("Community created successfully!");
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : "Failed to create community"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="communities-home">
       <div className="communities-home-container">
+
+        {/* HEADER */}
         <div className="communities-home-header">
           <div>
             <p className="communities-home-subtitle">
@@ -359,8 +445,17 @@ export default function CommunitiesHomePage() {
               Stay connected with the communities you joined.
             </p>
           </div>
+
+          <button
+            type="button"
+            className="create-community-btn"
+            onClick={() => setShowModal(true)}
+          >
+            + Create Community
+          </button>
         </div>
 
+        {/* TABS */}
         <div className="community-page-tabs">
           <Link
             href="/communities/home"
@@ -377,6 +472,7 @@ export default function CommunitiesHomePage() {
           </Link>
         </div>
 
+        {/* LATEST POSTS */}
         <div className="communities-home-section">
           <h2>Latest Posts</h2>
           <p>Posts from communities you joined.</p>
@@ -393,7 +489,9 @@ export default function CommunitiesHomePage() {
         ) : posts.length === 0 ? (
           <div className="communities-home-empty">
             <div className="empty-icon">👥</div>
+
             <h2>Your communities are waiting!</h2>
+
             <p>
               You havent joined any communities yet, or there are
               no posts in your communities.
@@ -421,6 +519,7 @@ export default function CommunitiesHomePage() {
                   <span>{formatDate(post.createdAt)}</span>
                 </div>
 
+                {/* AUTHOR */}
                 <div className="community-post-author">
                   {post.author.avatarUrl ? (
                     <img
@@ -440,14 +539,17 @@ export default function CommunitiesHomePage() {
                     <strong>
                       {post.author.name || post.author.username}
                     </strong>
+
                     <span>@{post.author.username}</span>
                   </div>
                 </div>
 
+                {/* CONTENT */}
                 <p className="community-post-content">
                   {post.content}
                 </p>
 
+                {/* ACTIONS */}
                 <div className="community-post-actions">
                   <button
                     type="button"
@@ -475,16 +577,12 @@ export default function CommunitiesHomePage() {
                     className={`community-action-btn community-save-btn ${post.isBookmarked ? "saved" : ""}`}
                     onClick={() => handleBookmark(post.id)}
                     disabled={bookmarkingPosts.includes(post.id)}
-                    title={
-                      post.isBookmarked
-                        ? "Remove bookmark"
-                        : "Save post"
-                    }
                   >
                     {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
                   </button>
                 </div>
 
+                {/* COMMENTS */}
                 {openComments.includes(post.id) && (
                   <div className="community-comments">
                     <h3>Comments</h3>
@@ -525,12 +623,14 @@ export default function CommunitiesHomePage() {
                                   {comment.user.name ||
                                     comment.user.username}
                                 </strong>
+
                                 <span>
                                   @{comment.user.username}
                                 </span>
                               </div>
 
                               <p>{comment.content}</p>
+
                               <small>
                                 {formatDate(comment.createdAt)}
                               </small>
@@ -577,6 +677,108 @@ export default function CommunitiesHomePage() {
           </div>
         )}
       </div>
+
+      {/* CREATE COMMUNITY MODAL */}
+      {showModal && (
+        <div
+          className="modal-overlay"
+          onClick={closeModal}
+        >
+          <div
+            className="create-community-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Create Community</h2>
+
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={closeModal}
+                disabled={submitting}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCommunity}>
+              <div className="form-group">
+                <label htmlFor="community-name">
+                  Community Name
+                </label>
+
+                <input
+                  id="community-name"
+                  type="text"
+                  placeholder="Enter community name"
+                  value={communityName}
+                  onChange={(event) =>
+                    setCommunityName(event.target.value)
+                  }
+                  maxLength={50}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="community-description">
+                  Description
+                </label>
+
+                <textarea
+                  id="community-description"
+                  placeholder="Describe your community..."
+                  value={description}
+                  onChange={(event) =>
+                    setDescription(event.target.value)
+                  }
+                  rows={4}
+                  maxLength={300}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="community-image">
+                  Image URL
+                </label>
+
+                <input
+                  id="community-image"
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={image}
+                  onChange={(event) =>
+                    setImage(event.target.value)
+                  }
+                />
+              </div>
+
+              {formError && (
+                <p className="form-error">{formError}</p>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={closeModal}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={submitting}
+                >
+                  {submitting ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
