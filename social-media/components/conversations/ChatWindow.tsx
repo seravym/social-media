@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ChatMessageDto } from "@/lib/types";
 import { ChatHeader } from "@/components/conversations/ChatHeader";
@@ -47,6 +47,37 @@ const CHAT_THEMES: Record<
   },
 };
 
+function startOfDay(value: Date) {
+  return new Date(
+    value.getFullYear(),
+    value.getMonth(),
+    value.getDate(),
+  ).getTime();
+}
+
+function formatDateLabel(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const diffDays = Math.round(
+    (startOfDay(today) - startOfDay(date)) / 86_400_000,
+  );
+
+  if (diffDays === 0) return "Hari Ini";
+  if (diffDays === 1) return "Kemarin";
+
+  return date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() !== today.getFullYear()
+      ? { year: "numeric" as const }
+      : {}),
+  });
+}
+
+function isSameDay(a: string, b: string) {
+  return startOfDay(new Date(a)) === startOfDay(new Date(b));
+}
+
 interface ChatWindowProps {
   name: string;
   subtitle: string;
@@ -54,13 +85,20 @@ interface ChatWindowProps {
   currentUserId: string;
   isSelfNotes: boolean;
   loading: boolean;
+  loadingMore: boolean;
   messages: ChatMessageDto[];
+  hasMore: boolean;
+  error: string | null;
+  sendError: string | null;
   background: string | null;
   vanishMode: boolean;
   initialDraft?: string;
   onClearInitialDraft?: () => void;
   onBack: () => void;
   onSendMessage: (body: string, imageUrl: string | null) => Promise<void>;
+  onLoadMore: () => void;
+  onRetryLoad: () => void;
+  onRetrySend: () => void;
   onOpenMedia: () => void;
   onOpenSettings: () => void;
 }
@@ -72,13 +110,20 @@ export function ChatWindow({
   currentUserId,
   isSelfNotes,
   loading,
+  loadingMore,
   messages,
+  hasMore,
+  error,
+  sendError,
   background,
   vanishMode,
   initialDraft = "",
   onClearInitialDraft,
   onBack,
   onSendMessage,
+  onLoadMore,
+  onRetryLoad,
+  onRetrySend,
   onOpenMedia,
   onOpenSettings,
 }: ChatWindowProps) {
@@ -93,6 +138,13 @@ export function ChatWindow({
     null,
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
+  const pendingScrollRef = useRef(false);
+  const pendingPrependRef = useRef(false);
+  const prependMetricsRef = useRef({ scrollHeight: 0, scrollTop: 0 });
+  const prependStartCountRef = useRef(0);
+  const prevCountRef = useRef(0);
 
   if (initialDraft !== prevInitialDraft) {
     setPrevInitialDraft(initialDraft);
@@ -100,6 +152,60 @@ export function ChatWindow({
       setText(initialDraft);
     }
   }
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const previousCount = prevCountRef.current;
+    const isInitial = previousCount === 0 && messages.length > 0;
+
+    if (pendingPrependRef.current) {
+      const { scrollHeight, scrollTop } = prependMetricsRef.current;
+      el.scrollTop = el.scrollHeight - scrollHeight + scrollTop;
+      pendingPrependRef.current = false;
+    } else if (
+      isInitial ||
+      pendingScrollRef.current ||
+      (messages.length > previousCount && stickToBottomRef.current)
+    ) {
+      el.scrollTop = el.scrollHeight;
+      stickToBottomRef.current = true;
+    }
+
+    pendingScrollRef.current = false;
+    prevCountRef.current = messages.length;
+  }, [messages]);
+
+  useEffect(() => {
+    if (
+      !loadingMore &&
+      pendingPrependRef.current &&
+      messages.length === prependStartCountRef.current
+    ) {
+      pendingPrependRef.current = false;
+    }
+  }, [loadingMore, messages.length]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
+
+  const handleLoadMore = () => {
+    const el = scrollRef.current;
+    if (el) {
+      prependMetricsRef.current = {
+        scrollHeight: el.scrollHeight,
+        scrollTop: el.scrollTop,
+      };
+      prependStartCountRef.current = messages.length;
+      pendingPrependRef.current = true;
+    }
+    onLoadMore();
+  };
 
   const handleReact = (messageId: string, emoji: string) => {
     setReactions((prev) => ({
@@ -134,6 +240,7 @@ export function ChatWindow({
     setText("");
     setImagePreview(null);
     setReplyTarget(null);
+    pendingScrollRef.current = true;
     if (onClearInitialDraft) {
       onClearInitialDraft();
     }
@@ -147,6 +254,7 @@ export function ChatWindow({
   };
 
   const handleSendSticker = (stickerText: string) => {
+    pendingScrollRef.current = true;
     void onSendMessage(stickerText, null);
   };
 
@@ -190,21 +298,45 @@ export function ChatWindow({
         onOpenSettings={onOpenSettings}
       />
 
-      {loading && messages.length === 0 ? (
+      {error ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p
+            className={`text-sm font-medium ${
+              vanishMode ? "text-slate-300" : "text-slate-700"
+            }`}
+          >
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={onRetryLoad}
+            className="rounded-lg bg-[#b85c7a] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
+          >
+            Coba lagi
+          </button>
+        </div>
+      ) : loading && messages.length === 0 ? (
         <MessageAreaSkeleton />
       ) : (
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          {messages.length > 0 && (
-            <div className="flex justify-center">
-              <span
-                className={`rounded-md px-2.5 py-0.5 text-[11px] font-medium ${
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+        >
+          {hasMore && (
+            <div className="flex justify-center pb-1">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                   vanishMode
-                    ? "bg-slate-800/90 text-slate-300"
-                    : "glass-chip text-slate-500"
+                    ? "border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                    : "glass-chip text-[#9e4865] hover:bg-white/85"
                 }`}
               >
-                Hari Ini
-              </span>
+                {loadingMore ? "Memuat..." : "Muat pesan sebelumnya"}
+              </button>
             </div>
           )}
 
@@ -226,23 +358,43 @@ export function ChatWindow({
               </p>
             </div>
           ) : (
-            messages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                isMine={isSelfNotes || msg.senderId === currentUserId}
-                bubbleClass={activeBubbleClass}
-                reaction={reactions[msg.id]}
-                replyTo={replyMap[msg.id]}
-                isPinned={pinnedMessage?.id === msg.id}
-                vanishMode={vanishMode}
-                onReact={handleReact}
-                onReply={(m) => setReplyTarget({ id: m.id, body: m.body })}
-                onPin={(m) =>
-                  setPinnedMessage((prev) => (prev?.id === m.id ? null : m))
-                }
-              />
-            ))
+            messages.map((msg, index) => {
+              const previous = messages[index - 1];
+              const showDate =
+                !previous || !isSameDay(previous.createdAt, msg.createdAt);
+
+              return (
+                <Fragment key={msg.id}>
+                  {showDate && (
+                    <div className="flex justify-center">
+                      <span
+                        className={`rounded-md px-2.5 py-0.5 text-[11px] font-medium ${
+                          vanishMode
+                            ? "bg-slate-800/90 text-slate-300"
+                            : "glass-chip text-slate-500"
+                        }`}
+                      >
+                        {formatDateLabel(msg.createdAt)}
+                      </span>
+                    </div>
+                  )}
+                  <MessageBubble
+                    message={msg}
+                    isMine={isSelfNotes || msg.senderId === currentUserId}
+                    bubbleClass={activeBubbleClass}
+                    reaction={reactions[msg.id]}
+                    replyTo={replyMap[msg.id]}
+                    isPinned={pinnedMessage?.id === msg.id}
+                    vanishMode={vanishMode}
+                    onReact={handleReact}
+                    onReply={(m) => setReplyTarget({ id: m.id, body: m.body })}
+                    onPin={(m) =>
+                      setPinnedMessage((prev) => (prev?.id === m.id ? null : m))
+                    }
+                  />
+                </Fragment>
+              );
+            })
           )}
         </div>
       )}
@@ -254,6 +406,22 @@ export function ChatWindow({
             : "border-white/75 bg-white/45 backdrop-blur-md"
         }`}
       >
+        {sendError && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#faf0f3] px-3 py-1.5 text-xs text-[#9e4865]">
+            <span className="truncate">{sendError}</span>
+            <button
+              type="button"
+              onClick={() => {
+                pendingScrollRef.current = true;
+                onRetrySend();
+              }}
+              className="shrink-0 font-semibold underline underline-offset-2"
+            >
+              Kirim ulang
+            </button>
+          </div>
+        )}
+
         {replyTarget && (
           <div className="glass-chip mb-2 flex items-center justify-between rounded-lg px-3 py-1.5 text-xs">
             <div className="min-w-0">
