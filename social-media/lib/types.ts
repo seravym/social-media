@@ -37,8 +37,20 @@ export interface ConversationDto {
   updatedAt: string;
 }
 
+export interface ConversationListResponse {
+  currentUserId: string;
+  items: ConversationDto[];
+}
+
+export interface ConversationMessagesResponse {
+  currentUserId: string;
+  messages: ChatMessageDto[];
+  hasMore: boolean;
+}
+
 export interface ConversationDetailDto {
   id: string;
+  currentUserId: string;
   background: string | null;
   other: UserCard | null;
   nickname: string | null;
