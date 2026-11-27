@@ -19,7 +19,7 @@ export default function LoginForm() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: form.get("email"),
+        username: form.get("username"),
         password: form.get("password"),
       }),
     });
@@ -38,8 +38,8 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label htmlFor="email">Email</label>
-      <input id="email" name="email" type="email" placeholder="Email" required />
+      <label htmlFor="username">Username</label>
+      <input id="username" name="username" type="text" placeholder="Username" required />
 
       <label htmlFor="password">Password</label>
       <input id="password" name="password" type="password" placeholder="Password" required />
