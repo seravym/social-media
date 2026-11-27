@@ -36,7 +36,6 @@ export default function ArticlesPage() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        // jeda 300 ms supaya tidak memanggil API di setiap ketikan
         const timer = setTimeout(async () => {
         setLoading(true);
         setError("");
@@ -59,12 +58,12 @@ export default function ArticlesPage() {
     }, [tab, query]);
 
     return (
-        <main className="mx-auto max-w-2xl px-4 py-6">
+        <main className="mx-auto w-full max-w-4xl px-6 py-8">
         <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-pink-600">Articles</h1>
+            <h1 className="text-2xl font-bold text-pink-600">Articles</h1>
             <Link
             href="/articles/new"
-            className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700"
+            className="rounded-full bg-pink-600 px-4 py-2 text-base font-semibold text-white hover:bg-pink-700"
             >
             New Articles
             </Link>
@@ -74,7 +73,7 @@ export default function ArticlesPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Cari artikel atau penulis"
-            className="mb-4 w-full rounded-full bg-gray-100 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-400"
+            className="mb-4 w-full rounded-full bg-gray-100 px-4 py-2 text-base outline-none focus:ring-2 focus:ring-pink-400"
         />
 
         <div className="mb-4 flex gap-4 overflow-x-auto border-b border-gray-200">
@@ -82,7 +81,7 @@ export default function ArticlesPage() {
             <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`whitespace-nowrap pb-2 text-sm font-semibold ${
+                className={`whitespace-nowrap pb-2 text-base font-semibold ${
                 tab === t
                     ? "border-b-2 border-pink-600 text-pink-600"
                     : "text-gray-500 hover:text-gray-800"
@@ -109,17 +108,17 @@ export default function ArticlesPage() {
             <li key={a.id}>
                 <Link href={`/articles/${a.id}`} className="block">
                 <div className="flex h-40 items-end rounded-xl bg-gradient-to-br from-pink-500 to-rose-700 p-3">
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold">
                     {a.category}
                     </span>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-sm text-gray-500">
                     {a.author.name ?? a.author.username} @{a.author.username} ·{" "}
                     {formatDate(a.createdAt)} · {readTime(a.content)} mnt baca
                 </p>
-                <h2 className="mt-1 text-lg font-bold">{a.title}</h2>
-                <p className="mt-1 line-clamp-2 text-sm text-gray-600">{a.content}</p>
-                <p className="mt-2 text-xs text-gray-500">
+                <h2 className="mt-1 text-xl font-bold">{a.title}</h2>
+                <p className="mt-1 line-clamp-2 text-base text-gray-600">{a.content}</p>
+                <p className="mt-2 text-sm text-gray-500">
                     ♥ {a.likeCount} · 💬 {a.commentCount} · {a.views} tayangan
                 </p>
                 </Link>
