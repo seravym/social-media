@@ -6,21 +6,21 @@ import { createSession } from "@/lib/session";
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
-    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    const username = typeof body?.username === "string" ? body.username.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
 
-    if (!email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { error: "Email dan password wajib diisi" },
+        { error: "Username dan password wajib diisi" },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { username } });
     const valid = user?.passwordHash && (await bcrypt.compare(password, user.passwordHash));
 
     if (!user || !valid) {
-      return NextResponse.json({ error: "Email atau password salah" }, { status: 401 });
+      return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
     }
     if (!user.emailVerified) {
       return NextResponse.json({ error: "Email belum diverifikasi" }, { status: 403 });
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       username: user.username,
     });
   } catch (err) {
-    console.error(err);
+    console.error("LOGIN ERROR:", err);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
   }
 }

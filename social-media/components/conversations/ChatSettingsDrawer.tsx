@@ -24,6 +24,7 @@ interface ChatSettingsDrawerProps {
   onToggleVanish: (value: boolean) => void;
   onPreviewChange?: (draft: SettingsDraft) => void;
   onSaveSettings: (updated: SettingsDraft) => void;
+  onDeleteConversation: (conversationId: string) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -48,6 +49,7 @@ export function ChatSettingsDrawer({
   onToggleVanish,
   onPreviewChange,
   onSaveSettings,
+  onDeleteConversation,
   onClose,
 }: ChatSettingsDrawerProps) {
   const initialBg = background === "pink" ? "rose" : (background ?? "");
@@ -56,9 +58,14 @@ export function ChatSettingsDrawer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const bgFileRef = useRef<HTMLInputElement | null>(null);
 
-  const sharedImages = messages.filter((m) => Boolean(m.imageUrl));
+  const sharedImages = messages.filter(
+    (m) => Boolean(m.imageUrl) && !m.deletedAt,
+  );
   const isCustomBg =
     selectedBg.startsWith("http://") ||
     selectedBg.startsWith("https://") ||
@@ -122,6 +129,19 @@ export function ChatSettingsDrawer({
       setError("Terjadi kesalahan jaringan.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!conversationId) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const ok = await onDeleteConversation(conversationId);
+    setDeleting(false);
+    if (ok) {
+      onClose();
+    } else {
+      setDeleteError("Gagal menghapus percakapan.");
     }
   };
 
@@ -205,7 +225,7 @@ export function ChatSettingsDrawer({
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-700">
-                    Tema & Warna Bubble
+                    Tema & Warna Balon
                   </span>
                   <input
                     ref={bgFileRef}
@@ -219,7 +239,7 @@ export function ChatSettingsDrawer({
                     onClick={() => bgFileRef.current?.click()}
                     className="text-[11px] font-medium text-slate-600 underline underline-offset-2 transition hover:text-slate-900"
                   >
-                    Wallpaper foto
+                    Gambar latar
                   </button>
                 </div>
 
@@ -254,14 +274,14 @@ export function ChatSettingsDrawer({
                     <div className="flex items-center gap-2">
                       <Image
                         src={selectedBg}
-                        alt="Wallpaper pilihan"
+                        alt="Latar pilihan"
                         width={36}
                         height={36}
                         unoptimized
                         className="h-9 w-9 rounded-lg object-cover"
                       />
                       <span className="text-xs font-medium text-slate-700">
-                        Wallpaper kustom
+                        Latar kustom
                       </span>
                     </div>
                     <button
@@ -281,7 +301,7 @@ export function ChatSettingsDrawer({
               <div className="glass-chip flex items-center justify-between rounded-xl p-3">
                 <div className="pr-3">
                   <p className="text-xs font-medium text-slate-800">
-                    Vanish Mode
+                    Mode Menghilang
                   </p>
                   <p className="mt-0.5 text-[11px] text-slate-500">
                     Tampilan gelap sementara untuk obrolan ini
@@ -302,6 +322,58 @@ export function ChatSettingsDrawer({
                     }`}
                   />
                 </button>
+              </div>
+
+              <div className="rounded-xl border border-[#b85c7a]/25 bg-[#faf0f3]/70 p-3">
+                <p className="text-xs font-medium text-slate-800">
+                  Hapus Percakapan
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Percakapan akan dihapus dari daftar Anda.
+                </p>
+
+                {!confirmDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDelete(true);
+                      setDeleteError(null);
+                    }}
+                    className="mt-2 rounded-lg border border-[#b85c7a]/40 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[#9e4865] transition hover:bg-white"
+                  >
+                    Hapus Percakapan
+                  </button>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-[11px] font-medium text-[#9e4865]">
+                      Yakin ingin menghapus percakapan ini?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteConversation()}
+                        disabled={deleting}
+                        className="rounded-lg bg-[#b85c7a] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#9e4865] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deleting ? "Menghapus..." : "Ya, Hapus"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(false)}
+                        disabled={deleting}
+                        className="rounded-lg px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:bg-white/70 disabled:opacity-50"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {deleteError && (
+                  <p className="mt-2 text-[11px] font-medium text-rose-600">
+                    {deleteError}
+                  </p>
+                )}
               </div>
 
               {error && (
