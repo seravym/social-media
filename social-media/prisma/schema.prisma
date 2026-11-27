@@ -1,28 +1,26 @@
-
-datasource db {
-  provider = "postgresql"
-}
-
 generator client {
   provider = "prisma-client"
   output   = "../generated"
 }
 
-// USER
+datasource db {
+  provider = "postgresql"
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  username  String   @unique
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  passwordHash  String?
-  emailVerified DateTime?
-  otpCodes      OtpCode[]
-  bio       String?
-  phone     String?
-  birthDate DateTime?
-  settings UserSettings?
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  username        String           @unique
+  avatarUrl       String?
+  createdAt       DateTime         @default(now())
+  passwordHash    String?
+  emailVerified   DateTime?
+  otpCodes        OtpCode[]
+  bio             String?
+  phone           String?
+  birthDate       DateTime?
+  settings        UserSettings?
   mutedWords      MutedWord[]
   mutedAccounts   MutedAccount[]
   blockedAccounts BlockedAccount[]
@@ -46,8 +44,8 @@ model User {
   listMemberships ListMember[]
 
   // ARTICLES
-  articles         Article[]        @relation("ArticleAuthor")
-  articleComments  ArticleComment[] @relation("ArticleCommentAuthor")
+  articles         Article[]         @relation("ArticleAuthor")
+  articleComments  ArticleComment[]  @relation("ArticleCommentAuthor")
   articleLikes     ArticleLike[]
   articleBookmarks ArticleBookmark[]
 
@@ -66,63 +64,55 @@ model User {
 
 // COMMUNITIES
 model Community {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
+  id          Int               @id @default(autoincrement())
+  name        String            @unique
   description String?
   image       String?
   creatorId   String
-  createdAt   DateTime @default(now())
-
-  creator User @relation(fields: [creatorId], references: [id])
-  members CommunityMember[]
-  posts   Post[]
+  createdAt   DateTime          @default(now())
+  creator     User              @relation(fields: [creatorId], references: [id])
+  members     CommunityMember[]
+  posts       Post[]
 }
 
-// COMMUNITY MEMBERS
 model CommunityMember {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   userId      String
   communityId Int
-  joinedAt    DateTime @default(now())
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, communityId])
 }
 
-// LISTS
 model List {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
   description String?
-  isPrivate   Boolean  @default(false)
+  isPrivate   Boolean      @default(false)
   ownerId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  owner   User         @relation("ListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members ListMember[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  owner       User         @relation("ListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     ListMember[]
 
   @@index([ownerId, createdAt])
   @@index([isPrivate, createdAt])
 }
 
-// LIST MEMBERS
 model ListMember {
-  id        Int      @id @default(autoincrement())
-  listId    Int
-  userId    String
-  addedAt   DateTime @default(now())
-
-  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      Int      @id @default(autoincrement())
+  listId  Int
+  userId  String
+  addedAt DateTime @default(now())
+  list    List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([listId, userId])
   @@index([userId])
 }
 
-// NOTIFICATION
 model Notification {
   id        String   @id @default(cuid())
   userId    String
@@ -132,25 +122,21 @@ model Notification {
   message   String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  user  User  @relation("ReceivedNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  actor User? @relation("SentNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+  actor     User?    @relation("SentNotifications", fields: [actorId], references: [id])
+  user      User     @relation("ReceivedNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
 }
 
-// CHAT
 model Conversation {
-  id         String   @id @default(cuid())
-  type       String
-  name       String?
-  background String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  members  ConversationMember[]
-  messages Message[]
+  id        String               @id @default(cuid())
+  type      String
+  name      String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   ConversationMember[]
+  messages  Message[]
 }
 
 model ConversationMember {
@@ -208,22 +194,19 @@ model MessageReaction {
 }
 
 model Article {
-  id            String   @id @default(cuid())
+  id            String            @id @default(cuid())
   authorId      String
   title         String
   content       String
   coverImageUrl String?
-  status        String   @default("published")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status        String            @default("published")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   publishedAt   DateTime?
-  category String @default("Technology")
-  views    Int    @default(0)
-
-  author    User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  comments  ArticleComment[]
-  likes     ArticleLike[]
-  bookmarks ArticleBookmark[]
+  author        User              @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  bookmarks     ArticleBookmark[]
+  comments      ArticleComment[]
+  likes         ArticleLike[]
 
   @@index([authorId, createdAt])
   @@index([status, publishedAt])
@@ -236,9 +219,8 @@ model ArticleComment {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([articleId, createdAt])
   @@index([userId])
@@ -249,9 +231,8 @@ model ArticleLike {
   articleId String
   userId    String
   createdAt DateTime @default(now())
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, userId])
   @@index([userId])
@@ -262,9 +243,8 @@ model ArticleBookmark {
   articleId String
   userId    String
   createdAt DateTime @default(now())
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, userId])
   @@index([userId, createdAt])
@@ -326,7 +306,7 @@ model News {
   id        String   @id @default(cuid())
   title     String
   summary   String
-  category  String   // News | Sports | Entertainment
+  category  String // News | Sports | Entertainment
   postCount Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -354,14 +334,12 @@ model SearchHistory {
   @@index([userId, createdAt])
 }
 
-
 model Bookmark {
   id        Int      @id @default(autoincrement())
   postId    String
   userId    String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
   @@index([userId, createdAt])
@@ -388,8 +366,8 @@ model Post {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  author    User      @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  community Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  author    User          @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  community Community?    @relation(fields: [communityId], references: [id], onDelete: SetNull)
   comments  PostComment[]
   likes     PostLike[]
 
