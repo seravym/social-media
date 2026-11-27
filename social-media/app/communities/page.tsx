@@ -274,14 +274,13 @@ export default function CommunitiesPage() {
         );
       }
 
-      const communityId = selectedCommunityId;
-
       setShowPostModal(false);
       setPostContent("");
       setSelectedCommunityId("");
       setPostError("");
 
-      router.push(`/communities/${communityId}`);
+      // REDIRECT TO COMMUNITIES HOME
+      router.push("/communities/home");
     } catch (error) {
       console.error("Create Post Error:", error);
 
