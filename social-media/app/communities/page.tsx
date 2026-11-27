@@ -106,12 +106,6 @@ export default function CommunitiesPage() {
         `/api/commmunities/${community.id}/membership`,
         {
           method: community.isJoined ? "DELETE" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
-          }),
         }
       );
 
@@ -176,7 +170,6 @@ export default function CommunitiesPage() {
           name: communityName.trim(),
           description: description.trim(),
           image: image.trim(),
-          creatorId: process.env.NEXT_PUBLIC_TEST_USER_ID,
         }),
       });
 
