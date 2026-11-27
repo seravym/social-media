@@ -4,11 +4,23 @@ export default function ProfilePage() {
   return (
     <div className="profile-layout">
       <main className="profile-page">
-        <section className="profile-banner" />
+        <section className="profile-banner" >
+            <img
+            src= "/banner.jpg"
+            alt= "banner tercinta"
+            className="banner-img"
+            />
+            </section>
 
         <section className="profile-information">
           <div className="profile-top-row">
-            <div className="profile-picture">Foto</div>
+            <div className="profile-picture">
+                <img
+                src="/juhoon.jpg"
+                alt="Ma juhoon Profile"
+                className="avatar-img"
+                />
+            </div>
 
             <div className="profile-stats">
               <div>
