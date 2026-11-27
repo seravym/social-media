@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import type { ChatMessageDto } from "@/lib/types";
+import type { ChatMessageDto, ConversationDto } from "@/lib/types";
 import { ChatHeader } from "@/components/conversations/ChatHeader";
 import {
   MessageBubble,
@@ -84,12 +84,15 @@ interface ChatWindowProps {
   avatarUrl: string | null;
   currentUserId: string;
   isSelfNotes: boolean;
+  isGroup?: boolean;
+  senderMap?: Record<string, string>;
   loading: boolean;
   loadingMore: boolean;
   messages: ChatMessageDto[];
   hasMore: boolean;
   error: string | null;
   sendError: string | null;
+  conversations: ConversationDto[];
   background: string | null;
   vanishMode: boolean;
   initialDraft?: string;
@@ -99,6 +102,12 @@ interface ChatWindowProps {
   onLoadMore: () => void;
   onRetryLoad: () => void;
   onRetrySend: () => void;
+  onEditMessage: (messageId: string, body: string) => Promise<boolean>;
+  onDeleteMessage: (messageId: string) => Promise<boolean>;
+  onForwardMessage: (
+    conversationId: string,
+    message: ChatMessageDto,
+  ) => Promise<boolean>;
   onOpenMedia: () => void;
   onOpenSettings: () => void;
 }
@@ -109,12 +118,15 @@ export function ChatWindow({
   avatarUrl,
   currentUserId,
   isSelfNotes,
+  isGroup = false,
+  senderMap,
   loading,
   loadingMore,
   messages,
   hasMore,
   error,
   sendError,
+  conversations,
   background,
   vanishMode,
   initialDraft = "",
@@ -124,6 +136,9 @@ export function ChatWindow({
   onLoadMore,
   onRetryLoad,
   onRetrySend,
+  onEditMessage,
+  onDeleteMessage,
+  onForwardMessage,
   onOpenMedia,
   onOpenSettings,
 }: ChatWindowProps) {
@@ -137,6 +152,12 @@ export function ChatWindow({
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessageDto | null>(
     null,
   );
+  const [forwardTarget, setForwardTarget] = useState<ChatMessageDto | null>(
+    null,
+  );
+  const [forwardingId, setForwardingId] = useState<string | null>(null);
+  const [forwardError, setForwardError] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
@@ -152,6 +173,13 @@ export function ChatWindow({
       setText(initialDraft);
     }
   }
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [openMenuId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -258,8 +286,22 @@ export function ChatWindow({
     void onSendMessage(stickerText, null);
   };
 
+  const handleForward = async (conversationId: string) => {
+    if (!forwardTarget) return;
+    setForwardingId(conversationId);
+    setForwardError(null);
+    const ok = await onForwardMessage(conversationId, forwardTarget);
+    setForwardingId(null);
+    if (ok) {
+      setForwardTarget(null);
+    } else {
+      setForwardError("Gagal meneruskan pesan.");
+    }
+  };
+
   const normalizedBg = background === "pink" ? "rose" : background;
-  const theme = (normalizedBg && CHAT_THEMES[normalizedBg]) || CHAT_THEMES.default;
+  const theme =
+    (normalizedBg && CHAT_THEMES[normalizedBg]) || CHAT_THEMES.default;
   const isCustomImageBg =
     background &&
     (background.startsWith("http://") ||
@@ -381,16 +423,28 @@ export function ChatWindow({
                   <MessageBubble
                     message={msg}
                     isMine={isSelfNotes || msg.senderId === currentUserId}
+                    senderName={isGroup ? senderMap?.[msg.senderId] : undefined}
                     bubbleClass={activeBubbleClass}
                     reaction={reactions[msg.id]}
                     replyTo={replyMap[msg.id]}
                     isPinned={pinnedMessage?.id === msg.id}
                     vanishMode={vanishMode}
+                    menuOpen={openMenuId === msg.id}
+                    onToggleMenu={() =>
+                      setOpenMenuId((prev) => (prev === msg.id ? null : msg.id))
+                    }
+                    onCloseMenu={() => setOpenMenuId(null)}
                     onReact={handleReact}
                     onReply={(m) => setReplyTarget({ id: m.id, body: m.body })}
                     onPin={(m) =>
                       setPinnedMessage((prev) => (prev?.id === m.id ? null : m))
                     }
+                    onEditMessage={onEditMessage}
+                    onDeleteMessage={onDeleteMessage}
+                    onForward={(m) => {
+                      setForwardError(null);
+                      setForwardTarget(m);
+                    }}
                   />
                 </Fragment>
               );
@@ -444,7 +498,7 @@ export function ChatWindow({
           <div className="glass-chip mb-2 inline-flex items-start gap-2 rounded-xl p-2">
             <Image
               src={imagePreview}
-              alt="Preview"
+              alt="Pratinjau"
               width={64}
               height={64}
               unoptimized
@@ -528,7 +582,7 @@ export function ChatWindow({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={
-              vanishMode ? "Ketik pesan vanish mode..." : "Tulis pesan..."
+              vanishMode ? "Ketik pesan mode menghilang..." : "Tulis pesan..."
             }
             className={`flex-1 rounded-xl border px-3.5 py-2 text-sm outline-none transition ${
               vanishMode
@@ -546,6 +600,104 @@ export function ChatWindow({
           </button>
         </form>
       </div>
+
+      {forwardTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs"
+          onClick={() => {
+            if (!forwardingId) {
+              setForwardTarget(null);
+              setForwardError(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass-panel w-full max-w-sm overflow-hidden rounded-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-white/70 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Teruskan Pesan
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setForwardTarget(null);
+                  setForwardError(null);
+                }}
+                disabled={forwardingId !== null}
+                aria-label="Tutup"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/70 hover:text-slate-700 disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto p-2">
+              {conversations.length === 0 ? (
+                <p className="px-3 py-6 text-center text-xs text-slate-500">
+                  Belum ada percakapan.
+                </p>
+              ) : (
+                conversations.map((conversation) => {
+                  const isGroupConv = conversation.type === "group";
+                  const targetName = isGroupConv
+                    ? conversation.name || "Grup"
+                    : conversation.nickname ||
+                      conversation.other?.displayName ||
+                      "User";
+
+                  return (
+                    <button
+                      key={conversation.id}
+                      type="button"
+                      onClick={() => void handleForward(conversation.id)}
+                      disabled={forwardingId !== null}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition hover:bg-white/70 disabled:opacity-60"
+                    >
+                      {!isGroupConv && conversation.other?.avatarUrl ? (
+                        <Image
+                          src={conversation.other.avatarUrl}
+                          alt={targetName}
+                          width={32}
+                          height={32}
+                          unoptimized
+                          className="h-8 w-8 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#faf0f3] text-xs font-semibold text-[#b85c7a]">
+                          {targetName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-slate-900">
+                          {targetName}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500">
+                          {isGroupConv
+                            ? "Grup"
+                            : `@${conversation.other?.username ?? "user"}`}
+                        </p>
+                      </div>
+                      {forwardingId === conversation.id && (
+                        <span className="text-[11px] font-medium text-[#b85c7a]">
+                          Mengirim...
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {forwardError && (
+              <p className="border-t border-white/70 px-4 py-2 text-xs text-rose-600">
+                {forwardError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

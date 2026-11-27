@@ -19,6 +19,9 @@ export interface ChatMessageDto {
   senderId: string;
   body: string;
   imageUrl: string | null;
+  isForwarded: boolean;
+  editedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
 }
 
@@ -29,6 +32,8 @@ export interface ConversationMemberDto {
 
 export interface ConversationDto {
   id: string;
+  type?: string;
+  name?: string | null;
   other: UserCard | null;
   nickname: string | null;
   background: string | null;
@@ -50,6 +55,8 @@ export interface ConversationMessagesResponse {
 
 export interface ConversationDetailDto {
   id: string;
+  type?: string;
+  name?: string | null;
   currentUserId: string;
   background: string | null;
   other: UserCard | null;

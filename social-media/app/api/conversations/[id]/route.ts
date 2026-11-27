@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { toUserCard, userCardSelect } from "@/lib/dto";
-import { authed, json } from "@/lib/route";
+import { authed, json, noContent } from "@/lib/route";
 import type { ConversationDetailDto } from "@/lib/types";
 
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -60,6 +60,8 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
 
   const dto: ConversationDetailDto = {
     id: conv.id,
+    type: conv.type,
+    name: conv.name ?? null,
     currentUserId: user.id,
     background: conv.background ?? null,
     other: otherMember ? toUserCard(otherMember.user) : null,
@@ -73,6 +75,9 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
       senderId: msg.senderId,
       body: msg.body,
       imageUrl: msg.imageUrl,
+      isForwarded: msg.isForwarded,
+      editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
+      deletedAt: msg.deletedAt ? msg.deletedAt.toISOString() : null,
       createdAt: msg.createdAt.toISOString(),
     })),
   };
@@ -160,3 +165,21 @@ export const PATCH = authed(async (user, req, ctx: { params: Promise<{ id: strin
     })),
   });
 });
+
+export const DELETE = authed(
+  async (user, _req, ctx: { params: Promise<{ id: string }> }) => {
+    const { id } = await ctx.params;
+    const now = new Date();
+
+    const updated = await prisma.conversationMember.updateMany({
+      where: { conversationId: id, userId: user.id },
+      data: { hiddenAt: now, clearedAt: now },
+    });
+
+    if (updated.count === 0) {
+      return json({ error: "Conversation not found" }, 404);
+    }
+
+    return noContent();
+  }
+);
