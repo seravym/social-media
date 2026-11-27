@@ -69,7 +69,11 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
       }),
       prisma.conversationMember.update({
         where: { conversationId_userId: { conversationId: id, userId: user.id } },
-        data: { lastReadAt: now },
+        data: { lastReadAt: now, hiddenAt: null },
+      }),
+      prisma.conversationMember.updateMany({
+        where: { conversationId: id, hiddenAt: { not: null } },
+        data: { hiddenAt: null },
       }),
     ]);
 

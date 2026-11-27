@@ -33,8 +33,9 @@ model User {
   sentNotifications     Notification[] @relation("SentNotifications")
 
   // CHAT
-  conversations ConversationMember[]
-  messages      Message[]
+  conversations    ConversationMember[]
+  messages         Message[]
+  messageReactions MessageReaction[]
 
   // COMMUNITIES
   createdCommunities   Community[]
@@ -156,9 +157,11 @@ model ConversationMember {
   conversationId String
   userId         String
   nickname       String?
-  status         String   @default("active")
-  lastReadAt     DateTime @default(now())
-  joinedAt       DateTime @default(now())
+  status         String    @default("active")
+  lastReadAt     DateTime  @default(now())
+  hiddenAt       DateTime?
+  clearedAt      DateTime?
+  joinedAt       DateTime  @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -168,17 +171,40 @@ model ConversationMember {
 }
 
 model Message {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   conversationId String
   senderId       String
-  body           String   @default("")
+  body           String    @default("")
   imageUrl       String?
-  createdAt      DateTime @default(now())
+  replyToId      String?
+  isForwarded    Boolean   @default(false)
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  pinnedAt       DateTime?
+  createdAt      DateTime  @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      Message?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]         @relation("MessageReplies")
+  reactions    MessageReaction[]
 
   @@index([conversationId, createdAt])
+  @@index([replyToId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model Article {
