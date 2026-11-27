@@ -3,6 +3,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import "./communities.css";
 
 type Community = {
@@ -215,13 +216,13 @@ export default function CommunitiesPage() {
         <div className="communities-header">
           <div>
             <p className="communities-subtitle">
-              EXPLORE YOUR INTERESTS
+              YOUR COMMUNITY SPACE
             </p>
 
             <h1>Communities</h1>
 
             <p className="communities-description">
-              Find people who share your interests and join their communities.
+              Discover communities and connect with people who share your interests.
             </p>
           </div>
 
@@ -231,6 +232,29 @@ export default function CommunitiesPage() {
           >
             + Create Community
           </button>
+        </div>
+
+        <div className="community-page-tabs">
+          <Link
+            href="/communities/home"
+            className="community-page-tab"
+          >
+            Home
+          </Link>
+
+          <Link
+            href="/communities"
+            className="community-page-tab active"
+          >
+            Explore
+          </Link>
+        </div>
+
+        <div className="community-explore-heading">
+          <div>
+            <h2>Explore Communities</h2>
+            <p>Find a community that matches your interests.</p>
+          </div>
         </div>
 
         <div className="community-search">

@@ -16,6 +16,7 @@ interface ChatSidebarProps {
   pinnedIds: string[];
   onSelectChat: (id: string) => void;
   onStartChat: (userId: string) => void;
+  onCreateGroup: (name: string, memberIds: string[]) => Promise<boolean>;
   onTogglePin: (id: string) => void;
   onReplyNote: (conversationId: string, noteText: string) => void;
 }
@@ -27,6 +28,7 @@ export function ChatSidebar({
   pinnedIds,
   onSelectChat,
   onStartChat,
+  onCreateGroup,
   onTogglePin,
   onReplyNote,
 }: ChatSidebarProps) {
@@ -34,6 +36,14 @@ export function ChatSidebar({
   const [search, setSearch] = useState("");
   const [foundUsers, setFoundUsers] = useState<UserCard[]>([]);
   const [searching, setSearching] = useState(false);
+
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupSearch, setGroupSearch] = useState("");
+  const [groupResults, setGroupResults] = useState<UserCard[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<UserCard[]>([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
 
   useEffect(() => {
     const query = search.trim();
@@ -67,6 +77,28 @@ export function ChatSidebar({
     };
   }, [search]);
 
+  useEffect(() => {
+    if (!groupModalOpen) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/conversations/users?q=${encodeURIComponent(groupSearch.trim())}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setGroupResults(data.items ?? []);
+      } catch {
+        return;
+      }
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [groupModalOpen, groupSearch]);
+
   const totalUnread = conversations.reduce(
     (sum, chat) => sum + (chat.unreadCount || 0),
     0,
@@ -84,6 +116,35 @@ export function ChatSidebar({
     onStartChat(userId);
   };
 
+  const toggleMember = (user: UserCard) => {
+    setSelectedMembers((prev) =>
+      prev.some((m) => m.id === user.id)
+        ? prev.filter((m) => m.id !== user.id)
+        : [...prev, user],
+    );
+  };
+
+  const handleSubmitGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = groupName.trim();
+    if (!trimmed || selectedMembers.length === 0) return;
+    setCreatingGroup(true);
+    setGroupError(null);
+    const ok = await onCreateGroup(
+      trimmed,
+      selectedMembers.map((m) => m.id),
+    );
+    setCreatingGroup(false);
+    if (ok) {
+      setGroupModalOpen(false);
+      setGroupName("");
+      setGroupSearch("");
+      setSelectedMembers([]);
+    } else {
+      setGroupError("Gagal membuat grup.");
+    }
+  };
+
   return (
     <aside
       className={`${
@@ -92,19 +153,31 @@ export function ChatSidebar({
     >
       <div className="flex items-center justify-between border-b border-white/70 px-4 py-3.5">
         <div className="flex items-center gap-2">
-          <h1 className="text-base font-bold text-slate-900">Messages</h1>
+          <h1 className="text-base font-bold text-slate-900">Pesan</h1>
           {totalUnread > 0 && (
             <span className="rounded-full bg-[#b85c7a] px-2 py-0.5 text-[11px] font-semibold text-white">
               {totalUnread}
             </span>
           )}
         </div>
-        <Link
-          href="/home"
-          className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-white/70 hover:text-slate-800"
-        >
-          Home
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setGroupError(null);
+              setGroupModalOpen(true);
+            }}
+            className="rounded-lg bg-[#b85c7a] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
+          >
+            + Grup
+          </button>
+          <Link
+            href="/home"
+            className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-white/70 hover:text-slate-800"
+          >
+            Home
+          </Link>
+        </div>
       </div>
 
       <VibeNotesBar conversations={conversations} onReplyNote={onReplyNote} />
@@ -179,7 +252,7 @@ export function ChatSidebar({
                     </p>
                   </div>
                   <span className="text-[11px] font-semibold text-[#b85c7a]">
-                    Chat
+                    Obrolan
                   </span>
                 </button>
               ))
@@ -242,9 +315,7 @@ export function ChatSidebar({
                 Anda
               </span>
             </div>
-            <p className="truncate text-xs text-slate-500">
-              Draf anda
-            </p>
+            <p className="truncate text-xs text-slate-500">Draf Anda</p>
           </div>
         </button>
 
@@ -268,7 +339,7 @@ export function ChatSidebar({
                 ? "Belum ada percakapan"
                 : tab === "unread"
                   ? "Semua pesan sudah dibaca"
-                  : "Belum ada chat disematkan"}
+                  : "Belum ada obrolan disematkan"}
             </p>
             <p className="mt-1 text-xs text-slate-400">
               Cari user di atas untuk mulai mengobrol.
@@ -277,7 +348,10 @@ export function ChatSidebar({
         ) : (
           <div className="flex flex-col gap-1">
             {filteredConversations.map((chat) => {
-              const name = chat.nickname || chat.other?.displayName || "User";
+              const isGroup = chat.type === "group";
+              const name = isGroup
+                ? chat.name || "Grup"
+                : chat.nickname || chat.other?.displayName || "User";
               const isActive = chat.id === selectedId;
               const isPinned = pinnedIds.includes(chat.id);
               return (
@@ -297,7 +371,7 @@ export function ChatSidebar({
                       : "hover:bg-white/50"
                   }`}
                 >
-                  {chat.other?.avatarUrl ? (
+                  {!isGroup && chat.other?.avatarUrl ? (
                     <Image
                       src={chat.other.avatarUrl}
                       alt={name}
@@ -317,6 +391,11 @@ export function ChatSidebar({
                       <p className="truncate text-sm font-semibold text-slate-900">
                         {name}
                       </p>
+                      {isGroup && (
+                        <span className="rounded-md bg-[#faf0f3] px-1.5 py-0.5 text-[10px] font-medium text-[#9e4865]">
+                          Grup
+                        </span>
+                      )}
                       {isPinned && (
                         <svg
                           className="h-3 w-3 shrink-0 text-[#b85c7a]"
@@ -331,10 +410,12 @@ export function ChatSidebar({
                       )}
                     </div>
                     <p className="truncate text-xs text-slate-500">
-                      {chat.lastMessage?.body ||
-                        (chat.lastMessage?.imageUrl
-                          ? "Mengirim gambar"
-                          : "Mulai obrolan")}
+                      {chat.lastMessage?.deletedAt
+                        ? "Pesan telah dihapus"
+                        : chat.lastMessage?.body ||
+                          (chat.lastMessage?.imageUrl
+                            ? "Mengirim gambar"
+                            : "Mulai obrolan")}
                     </p>
                   </div>
 
@@ -345,7 +426,7 @@ export function ChatSidebar({
                         e.stopPropagation();
                         onTogglePin(chat.id);
                       }}
-                      title={isPinned ? "Lepas sematan" : "Sematkan chat"}
+                      title={isPinned ? "Lepas sematan" : "Sematkan obrolan"}
                       className={`rounded-md p-1 transition group-hover:opacity-100 hover:bg-white/80 ${
                         isPinned
                           ? "text-[#b85c7a] opacity-100"
@@ -375,6 +456,119 @@ export function ChatSidebar({
           </div>
         )}
       </div>
+
+      {groupModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs"
+          onClick={() => !creatingGroup && setGroupModalOpen(false)}
+        >
+          <form
+            onSubmit={handleSubmitGroup}
+            onClick={(e) => e.stopPropagation()}
+            className="glass-panel w-full max-w-sm overflow-hidden rounded-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-white/70 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Buat Grup Baru
+              </h3>
+              <button
+                type="button"
+                onClick={() => setGroupModalOpen(false)}
+                disabled={creatingGroup}
+                className="rounded-lg p-1 text-slate-400 hover:bg-white/70 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 p-4">
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Nama grup..."
+                maxLength={60}
+                className="w-full rounded-xl border border-white/85 bg-white/75 px-3 py-2 text-xs text-slate-900 outline-none focus:border-[#b85c7a]/60"
+              />
+
+              <input
+                type="text"
+                value={groupSearch}
+                onChange={(e) => setGroupSearch(e.target.value)}
+                placeholder="Cari anggota..."
+                className="w-full rounded-xl border border-white/85 bg-white/60 px-3 py-2 text-xs text-slate-900 outline-none focus:border-[#b85c7a]/60"
+              />
+
+              {selectedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedMembers.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleMember(m)}
+                      className="rounded-full bg-[#faf0f3] px-2.5 py-1 text-[11px] font-medium text-[#9e4865]"
+                    >
+                      {m.displayName} ✕
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-white/75 bg-white/60 p-1.5">
+                {groupResults.length === 0 ? (
+                  <p className="px-2 py-3 text-center text-xs text-slate-400">
+                    User tidak ditemukan.
+                  </p>
+                ) : (
+                  groupResults.map((user) => {
+                    const picked = selectedMembers.some(
+                      (m) => m.id === user.id,
+                    );
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleMember(user)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
+                          picked
+                            ? "bg-[#faf0f3] text-[#9e4865]"
+                            : "hover:bg-white/80"
+                        }`}
+                      >
+                        <span className="truncate font-medium">
+                          {user.displayName}{" "}
+                          <span className="text-slate-400">
+                            @{user.username}
+                          </span>
+                        </span>
+                        <span className="text-[11px] font-semibold">
+                          {picked ? "✓" : "+"}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {groupError && (
+                <p className="text-xs text-rose-600">{groupError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={
+                  creatingGroup ||
+                  !groupName.trim() ||
+                  selectedMembers.length === 0
+                }
+                className="w-full rounded-xl bg-[#b85c7a] py-2 text-xs font-semibold text-white transition hover:bg-[#9e4865] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creatingGroup ? "Membuat..." : "Buat Grup"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </aside>
   );
 }

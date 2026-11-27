@@ -47,7 +47,7 @@ export function ChatHeader({
                 : "text-slate-600 hover:bg-white/70"
             }`}
           >
-            Back
+            Kembali
           </button>
 
           {avatarUrl ? (
@@ -76,7 +76,7 @@ export function ChatHeader({
               <p className="truncate text-sm font-semibold">{name}</p>
               {vanishMode && (
                 <span className="rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
-                  Vanish
+                  Menghilang
                 </span>
               )}
             </div>

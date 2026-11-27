@@ -1,65 +1,74 @@
+import "./profile.css";
 
 export default function ProfilePage() {
-    return (
-        <main className="profile-page">
-
-            {/* Profile Header */}
-            <section className="profile-header">
-                <h2>Profile</h2>
+  return (
+    <div className="profile-layout">
+      <main className="profile-page">
+        <section className="profile-banner" >
+            <img
+            src= "/banner.jpg"
+            alt= "banner tercinta"
+            className="banner-img"
+            />
             </section>
 
-            {/* Profile Banner */}
-            <section className="profile-banner">
-                <div className="banner-placeholder">
-                    Profile Banner
-                </div>
-            </section>
+        <section className="profile-information">
+          <div className="profile-top-row">
+            <div className="profile-picture">
+                <img
+                src="/juhoon.jpg"
+                alt="Ma juhoon Profile"
+                className="avatar-img"
+                />
+            </div>
 
-            {/* Profile Information */}
-            <section className="profile-information">
+            <div className="profile-stats">
+              <div>
+                <strong>0</strong>
+                <span>Followers</span>
+              </div>
+              <div>
+                <strong>0</strong>
+                <span>Following</span>
+              </div>
+            </div>
 
-                <div className="profile-picture">
-                    Profile Picture
-                </div>
+            <div className="profile-actions">
+              <button type="button">Edit Profile</button>
+              <button type="button">Share</button>
+            </div>
+          </div>
 
-                <div className="profile-details">
-                    <h2>Amelia Febriani</h2>
-                    <p>@amelia</p>
+          <div className="profile-details">
+            <h2>Nama Akun</h2>
+            <p>@username</p>
+            <p>bergabung sejak 2026</p>
+          </div>
+        </section>
 
-                    <p>
-                        Information Technology Student.
-                        Interested in Web Development.
-                    </p>
+        <section className="profile-navigation">
+          <div className="active">Posts</div>
+          <div>Replies</div>
+          <div>Likes</div>
+        </section>
 
-                    <div className="profile-followers">
-                        <span>85 Following</span>
-                        <span>120 Followers</span>
-                    </div>
-                </div>
+        <section className="profile-posts">
+          <div className="post-item">
+            <p>
+              <strong>Nama Akun</strong> @username
+            </p>
+            <p>kenapa aku begadang terus??</p>
+          </div>
+        </section>
+      </main>
 
-                <button>Edit Profile</button>
-
-            </section>
-
-            {/* Profile Navigation */}
-            <section className="profile-navigation">
-                <div>Posts</div>
-                <div>Replies</div>
-                <div>Media</div>
-                <div>Likes</div>
-            </section>
-
-            {/* Profile Posts */}
-            <section className="profile-posts">
-                <h3>Posts</h3>
-
-                <div className="post-item">
-                    <p>Username</p>
-                    <p>This is my first post!</p>
-                </div>
-
-            </section>
-
-        </main>
-    );
+      <aside className="profile-sidebar">
+        <input type="text" placeholder="Search..." />
+        <div>
+          <h3>Trending</h3>
+          <p>#randomtrend</p>
+        </div>
+      </aside>
+    </div>
+  );
 }
