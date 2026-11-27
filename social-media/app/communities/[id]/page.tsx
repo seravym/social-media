@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import "./detail.css";
@@ -51,7 +51,22 @@ function CommunityDetailContent() {
   const [isJoined, setIsJoined] = useState(false);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [postContent, setPostContent] = useState("");
   const [error, setError] = useState("");
+
+  async function loadCommunity() {
+    const response = await fetch(`/api/commmunities/${communityId}`);
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || result.error || "Failed to fetch community."
+      );
+    }
+
+    setCommunity(result.data);
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -93,9 +108,7 @@ function CommunityDetailContent() {
       } catch (err) {
         if (!ignore) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "Something went wrong."
+            err instanceof Error ? err.message : "Something went wrong."
           );
         }
       } finally {
@@ -136,9 +149,7 @@ function CommunityDetailContent() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.message ||
-            result.error ||
-            "Failed to update membership"
+          result.message || result.error || "Failed to update membership."
         );
       }
 
@@ -160,12 +171,52 @@ function CommunityDetailContent() {
       });
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
+        err instanceof Error ? err.message : "Something went wrong."
       );
     } finally {
       setProcessing(false);
+    }
+  }
+
+  async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!community || !isJoined || !postContent.trim()) return;
+
+    setPosting(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: postContent.trim(),
+          communityId: community.id,
+          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to create post."
+        );
+      }
+
+      setPostContent("");
+
+      // Muat ulang detail agar post terbaru dan jumlah post ter-update.
+      await loadCommunity();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setPosting(false);
     }
   }
 
@@ -233,8 +284,7 @@ function CommunityDetailContent() {
             <p className="detail-creator">
               Created by{" "}
               <strong>
-                {community.creator.name ||
-                  community.creator.username}
+                {community.creator.name || community.creator.username}
               </strong>
             </p>
 
@@ -258,8 +308,41 @@ function CommunityDetailContent() {
         <section className="detail-posts-section">
           <div className="detail-posts-heading">
             <h2>Community Posts</h2>
-            <span>{community.posts.length} posts</span>
+            <span>{community._count.posts} posts</span>
           </div>
+
+          {isJoined ? (
+            <form
+              className="detail-create-post"
+              onSubmit={handleCreatePost}
+            >
+              <h3>Share something with the community 🌸</h3>
+
+              <textarea
+                value={postContent}
+                onChange={(event) => setPostContent(event.target.value)}
+                placeholder={`What's happening in ${community.name}?`}
+                rows={4}
+                maxLength={1000}
+                required
+              />
+
+              <div className="detail-create-post-footer">
+                <span>{postContent.length}/1000</span>
+
+                <button
+                  type="submit"
+                  disabled={posting || !postContent.trim()}
+                >
+                  {posting ? "Posting..." : "Post"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="detail-join-notice">
+              <p>Join this community to share your posts! 🌷</p>
+            </div>
+          )}
 
           {community.posts.length === 0 ? (
             <div className="detail-empty">
@@ -272,10 +355,7 @@ function CommunityDetailContent() {
           ) : (
             <div className="detail-post-list">
               {community.posts.map((post) => (
-                <article
-                  className="detail-post-card"
-                  key={post.id}
-                >
+                <article className="detail-post-card" key={post.id}>
                   <div className="detail-post-author">
                     {post.author.avatarUrl ? (
                       <img
@@ -298,9 +378,7 @@ function CommunityDetailContent() {
                     </div>
                   </div>
 
-                  <p className="detail-post-content">
-                    {post.content}
-                  </p>
+                  <p className="detail-post-content">{post.content}</p>
 
                   <div className="detail-post-footer">
                     <span>{formatDate(post.createdAt)}</span>
