@@ -6,16 +6,7 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
-function getUserId(request: Request) {
-  const url = new URL(request.url);
-  const userId =
-    url.searchParams.get("userId") ||
-    process.env.NEXT_PUBLIC_TEST_USER_ID;
-
-  return userId;
-}
-
-// CHECK MEMBERSHIP STATUS
+// GET COMMUNITY DETAIL + POSTS
 export async function GET(
   request: Request,
   { params }: Context
@@ -31,81 +22,93 @@ export async function GET(
       );
     }
 
-    const userId = getUserId(request);
-
-    if (!userId) {
-      return NextResponse.json(
-        { message: "User ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const membership = await prisma.communityMember.findUnique({
+    const community = await prisma.community.findUnique({
       where: {
-        userId_communityId: {
-          userId,
-          communityId,
+        id: communityId,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+        members: {
+          select: {
+            userId: true,
+          },
+        },
+        posts: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatarUrl: true,
+              },
+            },
+            _count: {
+              select: {
+                comments: true,
+                likes: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+            posts: true,
+          },
         },
       },
     });
 
+    if (!community) {
+      return NextResponse.json(
+        { message: "Community not found" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      isMember: !!membership,
+      data: community,
     });
   } catch (error) {
-    console.error("CHECK MEMBERSHIP ERROR:", error);
+    console.error("GET COMMUNITY DETAIL ERROR:", error);
 
     return NextResponse.json(
-      { message: "Failed to check membership" },
+      { message: "Failed to fetch community detail" },
       { status: 500 }
     );
   }
 }
 
-async function getMembershipData(
-  request: Request,
-  params: Context["params"]
-) {
-  const { id } = await params;
-  const communityId = Number(id);
-
-  if (!Number.isInteger(communityId) || communityId <= 0) {
-    return {
-      error: NextResponse.json(
-        { message: "Invalid community ID" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const body = await request.json().catch(() => ({}));
-  const userId =
-    body.userId || process.env.NEXT_PUBLIC_TEST_USER_ID;
-
-  if (!userId) {
-    return {
-      error: NextResponse.json(
-        { message: "User ID is required" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  return { communityId, userId };
-}
-
-// JOIN COMMUNITY
-export async function POST(
+// UPDATE COMMUNITY
+export async function PUT(
   request: Request,
   { params }: Context
 ) {
   try {
-    const result = await getMembershipData(request, params);
+    const { id } = await params;
+    const communityId = Number(id);
 
-    if ("error" in result) return result.error;
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid community ID" },
+        { status: 400 }
+      );
+    }
 
-    const { communityId, userId } = result;
+    const body = await request.json();
+    const { name, description, image, userId } = body;
 
     const community = await prisma.community.findUnique({
       where: { id: communityId },
@@ -118,62 +121,86 @@ export async function POST(
       );
     }
 
-    await prisma.communityMember.upsert({
-      where: {
-        userId_communityId: {
-          userId,
-          communityId,
-        },
-      },
-      update: {},
-      create: {
-        userId,
-        communityId,
+    if (community.creatorId !== userId) {
+      return NextResponse.json(
+        { message: "Only the creator can update this community" },
+        { status: 403 }
+      );
+    }
+
+    const updatedCommunity = await prisma.community.update({
+      where: { id: communityId },
+      data: {
+        name,
+        description,
+        image,
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Successfully joined community",
+      message: "Community updated successfully",
+      data: updatedCommunity,
     });
   } catch (error) {
-    console.error("JOIN COMMUNITY ERROR:", error);
+    console.error("UPDATE COMMUNITY ERROR:", error);
 
     return NextResponse.json(
-      { message: "Failed to join community" },
+      { message: "Failed to update community" },
       { status: 500 }
     );
   }
 }
 
-// LEAVE COMMUNITY
+// DELETE COMMUNITY
 export async function DELETE(
   request: Request,
   { params }: Context
 ) {
   try {
-    const result = await getMembershipData(request, params);
+    const { id } = await params;
+    const communityId = Number(id);
 
-    if ("error" in result) return result.error;
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return NextResponse.json(
+        { message: "Invalid community ID" },
+        { status: 400 }
+      );
+    }
 
-    const { communityId, userId } = result;
+    const { userId } = await request.json();
 
-    await prisma.communityMember.deleteMany({
-      where: {
-        userId,
-        communityId,
-      },
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+    });
+
+    if (!community) {
+      return NextResponse.json(
+        { message: "Community not found" },
+        { status: 404 }
+      );
+    }
+
+    if (community.creatorId !== userId) {
+      return NextResponse.json(
+        { message: "Only the creator can delete this community" },
+        { status: 403 }
+      );
+    }
+
+    await prisma.community.delete({
+      where: { id: communityId },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Successfully left community",
+      message: "Community deleted successfully",
     });
   } catch (error) {
-    console.error("LEAVE COMMUNITY ERROR:", error);
+    console.error("DELETE COMMUNITY ERROR:", error);
 
     return NextResponse.json(
-      { message: "Failed to leave community" },
+      { message: "Failed to delete community" },
       { status: 500 }
     );
   }
