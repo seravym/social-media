@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import "./communities.css";
 
 type Community = {
@@ -19,6 +19,7 @@ type Community = {
 export default function CommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
 
   const [showModal, setShowModal] = useState(false);
@@ -27,30 +28,47 @@ export default function CommunitiesPage() {
   const [image, setImage] = useState("");
   const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    async function fetchCommunities() {
-      try {
-        const response = await fetch("/api/commmunities");
-        const result = await response.json();
+  async function fetchCommunities(): Promise<Community[]> {
+    const response = await fetch("/api/commmunities");
+    const result = await response.json();
 
-        if (response.ok && result.success) {
-          setCommunities(result.data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch communities:", error);
-      } finally {
-        setLoading(false);
-      }
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to fetch communities");
     }
 
-    fetchCommunities();
+    return result.data;
+  }
+
+  useEffect(() => {
+    let ignore = false;
+
+    fetchCommunities()
+      .then((data) => {
+        if (!ignore) {
+          setCommunities(data);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to fetch communities:", error);
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const filteredCommunities = communities.filter((community) =>
     community.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  function handleCreateCommunity(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateCommunity(
+    e: FormEvent<HTMLFormElement>
+  ) {
     e.preventDefault();
 
     if (!communityName.trim()) {
@@ -64,16 +82,48 @@ export default function CommunitiesPage() {
     }
 
     setFormError("");
+    setSubmitting(true);
 
-    alert("Form is valid! API connection will be added later.");
+    try {
+      const response = await fetch("/api/commmunities", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: communityName.trim(),
+          description: description.trim(),
+          image: image.trim(),
+          creatorId: process.env.NEXT_PUBLIC_TEST_USER_ID,
+        }),
+      });
 
-    setShowModal(false);
-    setCommunityName("");
-    setDescription("");
-    setImage("");
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setFormError(result.message || "Failed to create community.");
+        return;
+      }
+
+      const updatedCommunities = await fetchCommunities();
+      setCommunities(updatedCommunities);
+
+      setShowModal(false);
+      setCommunityName("");
+      setDescription("");
+      setImage("");
+      setFormError("");
+    } catch (error) {
+      console.error("Create Community Error:", error);
+      setFormError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function closeModal() {
+    if (submitting) return;
+
     setShowModal(false);
     setFormError("");
   }
@@ -81,8 +131,6 @@ export default function CommunitiesPage() {
   return (
     <div className="communities-page">
       <div className="communities-container">
-
-        {/* Header */}
         <div className="communities-header">
           <div>
             <p className="communities-subtitle">
@@ -104,7 +152,6 @@ export default function CommunitiesPage() {
           </button>
         </div>
 
-        {/* Search */}
         <div className="community-search">
           <input
             type="text"
@@ -114,7 +161,6 @@ export default function CommunitiesPage() {
           />
         </div>
 
-        {/* Community List */}
         {loading ? (
           <p className="community-loading">
             Loading communities...
@@ -163,10 +209,8 @@ export default function CommunitiesPage() {
             ))}
           </div>
         )}
-
       </div>
 
-      {/* Create Community Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div
@@ -180,6 +224,7 @@ export default function CommunitiesPage() {
                 type="button"
                 className="modal-close-btn"
                 onClick={closeModal}
+                disabled={submitting}
               >
                 &times;
               </button>
@@ -195,6 +240,7 @@ export default function CommunitiesPage() {
                   value={communityName}
                   onChange={(e) => setCommunityName(e.target.value)}
                   maxLength={50}
+                  required
                 />
               </div>
 
@@ -230,19 +276,23 @@ export default function CommunitiesPage() {
                   type="button"
                   className="cancel-btn"
                   onClick={closeModal}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
 
-                <button type="submit" className="submit-btn">
-                  Create
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={submitting}
+                >
+                  {submitting ? "Creating..." : "Create"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }
