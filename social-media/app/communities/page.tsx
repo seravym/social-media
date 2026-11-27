@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import "./communities.css";
 
 type Community = {
@@ -18,6 +19,8 @@ type Community = {
 };
 
 export default function CommunitiesPage() {
+  const router = useRouter();
+
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +44,7 @@ export default function CommunitiesPage() {
 
     const communitiesData = result.data as Community[];
 
-    const communitiesWithMembership = await Promise.all(
+    return Promise.all(
       communitiesData.map(async (community) => {
         try {
           const membershipResponse = await fetch(
@@ -64,13 +67,6 @@ export default function CommunitiesPage() {
         }
       })
     );
-
-    return communitiesWithMembership;
-  }
-
-  async function refreshCommunities() {
-    const data = await fetchCommunities();
-    setCommunities(data);
   }
 
   useEffect(() => {
@@ -104,13 +100,11 @@ export default function CommunitiesPage() {
     setProcessingId(community.id);
     setActionError("");
 
-    const method = community.isJoined ? "DELETE" : "POST";
-
     try {
       const response = await fetch(
         `/api/commmunities/${community.id}/membership`,
         {
-          method,
+          method: community.isJoined ? "DELETE" : "POST",
           headers: {
             "Content-Type": "application/json",
           },
@@ -155,9 +149,7 @@ export default function CommunitiesPage() {
     }
   }
 
-  async function handleCreateCommunity(
-    e: FormEvent<HTMLFormElement>
-  ) {
+  async function handleCreateCommunity(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!communityName.trim()) {
@@ -194,7 +186,8 @@ export default function CommunitiesPage() {
         return;
       }
 
-      await refreshCommunities();
+      const updatedCommunities = await fetchCommunities();
+      setCommunities(updatedCommunities);
 
       setShowModal(false);
       setCommunityName("");
@@ -274,7 +267,14 @@ export default function CommunitiesPage() {
         ) : (
           <div className="community-grid">
             {filteredCommunities.map((community) => (
-              <div className="community-card" key={community.id}>
+              <div
+                className="community-card"
+                key={community.id}
+                onClick={() =>
+                  router.push(`/communities/${community.id}`)
+                }
+                style={{ cursor: "pointer" }}
+              >
                 <div className="community-image">
                   {community.image ? (
                     <img
@@ -304,7 +304,10 @@ export default function CommunitiesPage() {
                         ? "leave-community-btn"
                         : "join-community-btn"
                     }
-                    onClick={() => handleMembership(community)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMembership(community);
+                    }}
                     disabled={processingId === community.id}
                   >
                     {processingId === community.id
