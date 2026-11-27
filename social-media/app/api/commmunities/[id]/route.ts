@@ -3,38 +3,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 
-type Context = {
-  params: Promise<{ id: string }>;
-};
-
-// GET COMMUNITY DETAIL + POSTS + LIKE STATUS
-export async function GET(
-  request: Request,
-  { params }: Context
-) {
+export async function GET() {
   try {
-    const { id } = await params;
-    const communityId = Number(id);
-
-    const userId =
-      (await getSessionUserId()) ||
-      process.env.NEXT_PUBLIC_TEST_USER_ID ||
-      "";
-
-    if (!Number.isInteger(communityId) || communityId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid community ID",
-        },
-        { status: 400 }
-      );
-    }
-
-    const community = await prisma.community.findUnique({
-      where: {
-        id: communityId,
-      },
+    const communities = await prisma.community.findMany({
       include: {
         creator: {
           select: {
@@ -44,209 +15,101 @@ export async function GET(
             avatarUrl: true,
           },
         },
-        members: {
-          select: {
-            userId: true,
-          },
-        },
-        posts: {
-          include: {
-            author: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatarUrl: true,
-              },
-            },
-            likes: {
-              where: {
-                userId,
-              },
-              select: {
-                id: true,
-              },
-            },
-            _count: {
-              select: {
-                comments: true,
-                likes: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
         _count: {
           select: {
             members: true,
-            posts: true,
           },
         },
       },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
-
-    if (!community) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Community not found",
-        },
-        { status: 404 }
-      );
-    }
-
-    const formattedCommunity = {
-      ...community,
-      posts: community.posts.map((post) => {
-        const { likes, ...postData } = post;
-
-        return {
-          ...postData,
-          isLiked: likes.length > 0,
-        };
-      }),
-    };
 
     return NextResponse.json({
       success: true,
-      data: formattedCommunity,
+      data: communities,
     });
   } catch (error) {
-    console.error("GET COMMUNITY DETAIL ERROR:", error);
+    console.error("GET Communities Error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to fetch community detail",
+        message: "Failed to fetch communities",
       },
       { status: 500 }
     );
   }
 }
 
-// UPDATE COMMUNITY
-export async function PUT(
-  request: Request,
-  { params }: Context
-) {
+export async function POST(request: Request) {
   try {
-    const { id } = await params;
-    const communityId = Number(id);
+    const creatorId = await getSessionUserId();
 
-    if (!Number.isInteger(communityId) || communityId <= 0) {
+    if (!creatorId) {
       return NextResponse.json(
-        { success: false, message: "Invalid community ID" },
-        { status: 400 }
+        {
+          success: false,
+          message: "Please login first",
+        },
+        { status: 401 }
       );
     }
 
     const body = await request.json();
-    const { name, description, image, userId } = body;
+    const { name, description, image } = body;
 
-    const community = await prisma.community.findUnique({
-      where: { id: communityId },
-    });
-
-    if (!community) {
-      return NextResponse.json(
-        { success: false, message: "Community not found" },
-        { status: 404 }
-      );
-    }
-
-    if (community.creatorId !== userId) {
+    if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
         {
           success: false,
-          message: "Only the creator can update this community",
+          message: "Community name is required",
         },
-        { status: 403 }
-      );
-    }
-
-    const updatedCommunity = await prisma.community.update({
-      where: { id: communityId },
-      data: {
-        name,
-        description,
-        image,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Community updated successfully",
-      data: updatedCommunity,
-    });
-  } catch (error) {
-    console.error("UPDATE COMMUNITY ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to update community",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE COMMUNITY
-export async function DELETE(
-  request: Request,
-  { params }: Context
-) {
-  try {
-    const { id } = await params;
-    const communityId = Number(id);
-
-    if (!Number.isInteger(communityId) || communityId <= 0) {
-      return NextResponse.json(
-        { success: false, message: "Invalid community ID" },
         { status: 400 }
       );
     }
 
-    const { userId } = await request.json();
-
-    const community = await prisma.community.findUnique({
-      where: { id: communityId },
-    });
-
-    if (!community) {
-      return NextResponse.json(
-        { success: false, message: "Community not found" },
-        { status: 404 }
-      );
-    }
-
-    if (community.creatorId !== userId) {
+    if (name.trim().length < 3) {
       return NextResponse.json(
         {
           success: false,
-          message: "Only the creator can delete this community",
+          message: "Community name must be at least 3 characters",
         },
-        { status: 403 }
+        { status: 400 }
       );
     }
 
-    await prisma.community.delete({
-      where: { id: communityId },
+    const community = await prisma.community.create({
+      data: {
+        name: name.trim(),
+        description:
+          typeof description === "string" && description.trim()
+            ? description.trim()
+            : null,
+        image:
+          typeof image === "string" && image.trim()
+            ? image.trim()
+            : null,
+        creatorId,
+      },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Community deleted successfully",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Community created successfully",
+        data: community,
+      },
+      { status: 201 }
+    );
   } catch (error) {
-    console.error("DELETE COMMUNITY ERROR:", error);
+    console.error("POST Community Error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to delete community",
+        message: "Failed to create community",
       },
       { status: 500 }
     );
