@@ -5,6 +5,7 @@ import type {
   ChatMessageDto,
   ConversationDetailDto,
   ConversationDto,
+  ConversationListResponse,
 } from "@/lib/types";
 import { ChatSidebar } from "@/components/conversations/ChatSidebar";
 import { ChatWindow } from "@/components/conversations/ChatWindow";
@@ -38,18 +39,18 @@ export default function ConversationsPage() {
   );
   const [loadingList, setLoadingList] = useState(true);
   const [loadingChat, setLoadingChat] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   const selectedChat = conversations.find((c) => c.id === selectedId) ?? null;
   const isSelfNotes = selectedId === "self-notes";
-  const currentUserId =
-    detail?.members.find((m) => m.user.id !== detail.other?.id)?.user.id ?? "";
 
   const loadConversations = async () => {
     try {
       const res = await fetch("/api/conversations", { cache: "no-store" });
       if (!res.ok) return;
-      const data = await res.json();
+      const data = (await res.json()) as ConversationListResponse;
       setConversations(data.items ?? []);
+      setCurrentUserId(data.currentUserId ?? "");
     } finally {
       setLoadingList(false);
     }
@@ -68,6 +69,7 @@ export default function ConversationsPage() {
       if (!res.ok) return;
       const data = (await res.json()) as ConversationDetailDto;
       setDetail(data);
+      setCurrentUserId(data.currentUserId ?? "");
       setConversations((prev) =>
         prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)),
       );
