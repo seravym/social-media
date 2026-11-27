@@ -59,6 +59,7 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const sticker = parseSticker(message.body);
   const sharedPost = parsePostShare(message.body);
+  const isSending = message.id.startsWith("temp_");
   const timeText = new Date(message.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -74,21 +75,23 @@ export function MessageBubble({
         }`}
       >
         <div
-          className={`relative rounded-2xl px-3.5 py-2 text-sm shadow-xs ${
+          className={`relative px-3.5 py-2 text-sm transition-opacity ${
+            isSending ? "opacity-75" : "opacity-100"
+          } ${
             sticker
-              ? "bg-transparent px-1 py-1 shadow-none"
+              ? "bg-transparent px-1 py-1"
               : isMine
-                ? "bg-pink-600 text-white"
+                ? "rounded-2xl rounded-br-sm bg-pink-600 text-white"
                 : vanishMode
-                  ? "border border-slate-700 bg-slate-800 text-slate-100"
-                  : "border border-slate-200 bg-white text-slate-800"
+                  ? "rounded-2xl rounded-bl-sm border border-slate-700 bg-slate-800 text-slate-100"
+                  : "rounded-2xl rounded-bl-sm border border-slate-200 bg-white text-slate-800"
           }`}
         >
           {replyTo && (
             <div
-              className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${
+              className={`mb-1.5 rounded-md border-l-2 px-2 py-1 text-xs ${
                 isMine
-                  ? "border-pink-200 bg-pink-700/60 text-pink-100"
+                  ? "border-pink-200 bg-pink-700/50 text-pink-100"
                   : vanishMode
                     ? "border-pink-500 bg-slate-700/70 text-slate-300"
                     : "border-pink-400 bg-slate-100 text-slate-600"
@@ -114,9 +117,9 @@ export function MessageBubble({
           )}
 
           {sticker ? (
-            <div className="flex flex-col items-center rounded-2xl bg-white/80 px-3 py-2 shadow-xs backdrop-blur-xs">
+            <div className="flex flex-col items-center rounded-xl border border-slate-200/80 bg-white px-3 py-2">
               <span className="text-4xl">{sticker.emoji}</span>
-              <span className="mt-0.5 text-[10px] font-semibold text-slate-600">
+              <span className="mt-0.5 text-[10px] font-medium text-slate-500">
                 {sticker.label}
               </span>
             </div>
@@ -124,7 +127,9 @@ export function MessageBubble({
             <PostShareCard post={sharedPost} vanishMode={vanishMode} />
           ) : (
             message.body && (
-              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+              <p className="whitespace-pre-wrap break-words leading-relaxed">
+                {message.body}
+              </p>
             )
           )}
 
@@ -133,13 +138,12 @@ export function MessageBubble({
               sticker
                 ? "text-slate-400"
                 : isMine
-                  ? "text-pink-100"
+                  ? "text-pink-100/90"
                   : "text-slate-400"
             }`}
           >
-            {isPinned && <span>📌</span>}
-            <span>{timeText}</span>
-            {isMine && <span>✓✓</span>}
+            {isPinned && <span>Disematkan ·</span>}
+            <span>{isSending ? "Mengirim..." : timeText}</span>
           </div>
 
           {reaction && (
@@ -149,13 +153,13 @@ export function MessageBubble({
           )}
         </div>
 
-        <div className="flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 opacity-0 shadow-xs transition group-hover:opacity-100">
+        <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-1 py-0.5 opacity-0 transition group-hover:opacity-100">
           {QUICK_REACTIONS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => onReact(message.id, emoji)}
-              className="rounded-full p-1 text-xs transition hover:scale-110 hover:bg-pink-50"
+              className="rounded-md p-1 text-xs transition hover:bg-slate-100"
             >
               {emoji}
             </button>
@@ -164,17 +168,25 @@ export function MessageBubble({
             type="button"
             onClick={() => onReply(message)}
             title="Balas pesan"
-            className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+            className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           >
-            ↩
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 17 4 12 9 7" />
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+            </svg>
           </button>
           <button
             type="button"
             onClick={() => onPin(message)}
             title={isPinned ? "Lepas sematan" : "Sematkan pesan"}
-            className="rounded-full px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
+            className={`rounded-md p-1 transition hover:bg-slate-100 ${
+              isPinned ? "text-pink-600" : "text-slate-500 hover:text-slate-800"
+            }`}
           >
-            📌
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="17" x2="12" y2="22" />
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+            </svg>
           </button>
         </div>
       </div>
