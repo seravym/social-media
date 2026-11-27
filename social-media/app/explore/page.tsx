@@ -61,8 +61,15 @@ export default function ExplorePage() {
     if (res.ok) setHistory(await res.json());
   }
 
-  useEffect(() => {
-    loadHistory();
+    useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/explore/history");
+      if (!cancelled && res.ok) setHistory(await res.json());
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // pencarian langsung (jeda 300 ms)
