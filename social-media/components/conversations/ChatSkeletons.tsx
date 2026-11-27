@@ -24,7 +24,7 @@ export function ChatListSkeleton() {
 
 export function MessageAreaSkeleton() {
   return (
-    <div className="flex flex-1 flex-col justify-between p-4">
+    <div className="flex flex-1 flex-col p-4">
       <div className="flex flex-col gap-4">
         <div className="flex animate-pulse items-end gap-2">
           <div className="h-8 w-8 rounded-full bg-slate-200" />
@@ -41,7 +41,6 @@ export function MessageAreaSkeleton() {
           <div className="h-12 w-56 rounded-2xl bg-pink-100" />
         </div>
       </div>
-      <div className="mt-4 h-12 w-full animate-pulse rounded-full bg-slate-200" />
     </div>
   );
 }

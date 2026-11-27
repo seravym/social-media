@@ -12,10 +12,10 @@ import { StickerPicker } from "@/components/conversations/StickerPicker";
 import { MessageAreaSkeleton } from "@/components/conversations/ChatSkeletons";
 
 const PRESET_BACKGROUNDS: Record<string, string> = {
-  pink: "bg-gradient-to-b from-pink-50 to-rose-50",
-  ocean: "bg-gradient-to-b from-sky-50 to-cyan-50",
-  lavender: "bg-gradient-to-b from-purple-50 to-pink-50",
-  mint: "bg-gradient-to-b from-emerald-50 to-teal-50",
+  pink: "bg-gradient-to-b from-pink-50/80 to-rose-50/60",
+  ocean: "bg-gradient-to-b from-sky-50/80 to-cyan-50/60",
+  lavender: "bg-gradient-to-b from-purple-50/80 to-pink-50/60",
+  mint: "bg-gradient-to-b from-emerald-50/80 to-teal-50/60",
 };
 
 interface ChatWindowProps {
@@ -57,7 +57,6 @@ export function ChatWindow({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const [reactions, setReactions] = useState<Record<string, string>>({});
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [replyMap, setReplyMap] = useState<Record<string, ReplyTarget>>({});
@@ -92,26 +91,23 @@ export function ChatWindow({
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed && !imagePreview) return;
-    if (sending) return;
 
-    setSending(true);
-    try {
-      const currentReply = replyTarget;
-      await onSendMessage(trimmed, imagePreview);
-      if (currentReply) {
-        const tempKey = `${Date.now()}`;
-        setReplyMap((prev) => ({ ...prev, [tempKey]: currentReply }));
-      }
-      setText("");
-      setImagePreview(null);
-      setReplyTarget(null);
-      setIsTyping(false);
-      if (onClearInitialDraft) {
-        onClearInitialDraft();
-      }
-    } finally {
-      setSending(false);
+    const currentReply = replyTarget;
+    const currentImage = imagePreview;
+
+    setText("");
+    setImagePreview(null);
+    setReplyTarget(null);
+    if (onClearInitialDraft) {
+      onClearInitialDraft();
     }
+
+    if (currentReply) {
+      const tempKey = `${Date.now()}`;
+      setReplyMap((prev) => ({ ...prev, [tempKey]: currentReply }));
+    }
+
+    onSendMessage(trimmed, currentImage);
   };
 
   const handleSendSticker = async (stickerText: string) => {
@@ -149,7 +145,7 @@ export function ChatWindow({
       className={`relative flex flex-1 flex-col overflow-hidden ${
         vanishMode
           ? "bg-slate-950 text-slate-100"
-          : presetClass ?? "bg-slate-50/70"
+          : presetClass ?? "bg-slate-50/60"
       }`}
     >
       <ChatHeader
@@ -157,7 +153,6 @@ export function ChatWindow({
         subtitle={subtitle}
         avatarUrl={avatarUrl}
         isSelfNotes={isSelfNotes}
-        isTyping={isTyping}
         vanishMode={vanishMode}
         pinnedMessage={pinnedMessage}
         onBack={onBack}
@@ -171,12 +166,12 @@ export function ChatWindow({
       ) : (
         <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
           {messages.length > 0 && (
-            <div className="sticky top-1 z-10 flex justify-center">
+            <div className="flex justify-center">
               <span
-                className={`rounded-full px-3 py-0.5 text-[11px] font-medium shadow-xs backdrop-blur-xs ${
+                className={`rounded-md px-2.5 py-0.5 text-[11px] font-medium ${
                   vanishMode
-                    ? "bg-slate-800/90 text-slate-300"
-                    : "bg-white/90 text-slate-500"
+                    ? "bg-slate-800 text-slate-300"
+                    : "bg-slate-200/70 text-slate-500"
                 }`}
               >
                 Hari Ini
@@ -186,22 +181,19 @@ export function ChatWindow({
 
           {messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-xl">
-                👋
-              </div>
               <p
-                className={`text-sm font-semibold ${
-                  vanishMode ? "text-slate-200" : "text-slate-700"
+                className={`text-sm font-medium ${
+                  vanishMode ? "text-slate-300" : "text-slate-600"
                 }`}
               >
                 Belum ada pesan
               </p>
               <p
                 className={`mt-1 text-xs ${
-                  vanishMode ? "text-slate-400" : "text-slate-500"
+                  vanishMode ? "text-slate-500" : "text-slate-400"
                 }`}
               >
-                Kirim pesan, stiker, atau foto untuk memulai obrolan!
+                Mulai percakapan dengan mengirim pesan atau gambar
               </p>
             </div>
           ) : (
@@ -215,9 +207,7 @@ export function ChatWindow({
                 isPinned={pinnedMessage?.id === msg.id}
                 vanishMode={vanishMode}
                 onReact={handleReact}
-                onReply={(m) =>
-                  setReplyTarget({ id: m.id, body: m.body })
-                }
+                onReply={(m) => setReplyTarget({ id: m.id, body: m.body })}
                 onPin={(m) =>
                   setPinnedMessage((prev) => (prev?.id === m.id ? null : m))
                 }
@@ -227,9 +217,15 @@ export function ChatWindow({
         </div>
       )}
 
-      <div className="p-3">
+      <div
+        className={`border-t px-4 py-3 ${
+          vanishMode
+            ? "border-slate-800 bg-slate-900"
+            : "border-slate-100 bg-white"
+        }`}
+      >
         {replyTarget && (
-          <div className="mb-2 flex items-center justify-between rounded-xl border border-pink-200 bg-white/95 px-3 py-1.5 text-xs shadow-xs">
+          <div className="mb-2 flex items-center justify-between rounded-lg border border-pink-200 bg-pink-50/70 px-3 py-1.5 text-xs">
             <div className="min-w-0">
               <span className="font-semibold text-pink-600">Membalas: </span>
               <span className="truncate text-slate-600">
@@ -247,33 +243,26 @@ export function ChatWindow({
         )}
 
         {imagePreview && (
-          <div className="mb-2 inline-flex items-start gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xs">
+          <div className="mb-2 inline-flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
             <Image
               src={imagePreview}
               alt="Preview"
-              width={72}
-              height={72}
+              width={64}
+              height={64}
               unoptimized
-              className="h-16 w-16 rounded-xl object-cover"
+              className="h-14 w-14 rounded-lg object-cover"
             />
             <button
               type="button"
               onClick={() => setImagePreview(null)}
-              className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"
+              className="rounded-md px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"
             >
               ✕
             </button>
           </div>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className={`relative flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm backdrop-blur-md ${
-            vanishMode
-              ? "border-slate-700 bg-slate-900/90 text-slate-100"
-              : "border-slate-200 bg-white/90 text-slate-900"
-          }`}
-        >
+        <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -286,18 +275,35 @@ export function ChatWindow({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Kirim Gambar"
-            className="rounded-full p-2 text-base transition hover:bg-pink-50"
+            className={`rounded-lg p-2 transition ${
+              vanishMode
+                ? "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            }`}
           >
-            📷
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m21 15-5-5L5 21" />
+            </svg>
           </button>
 
           <button
             type="button"
             onClick={() => setShowStickers((prev) => !prev)}
-            title="Pilih Stiker"
-            className="rounded-full p-2 text-base transition hover:bg-pink-50"
+            title="Stiker"
+            className={`rounded-lg p-2 transition ${
+              vanishMode
+                ? "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            }`}
           >
-            😊
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
           </button>
 
           {showStickers && (
@@ -310,22 +316,21 @@ export function ChatWindow({
           <input
             type="text"
             value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setIsTyping(e.target.value.trim().length > 0);
-            }}
+            onChange={(e) => setText(e.target.value)}
             placeholder={
-              vanishMode
-                ? "Ketik pesan Vanish Mode..."
-                : "Tulis pesan..."
+              vanishMode ? "Ketik pesan vanish mode..." : "Tulis pesan..."
             }
-            className="flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-slate-400"
+            className={`flex-1 rounded-xl border px-3.5 py-2 text-sm outline-none transition ${
+              vanishMode
+                ? "border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-pink-500"
+                : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-pink-400 focus:bg-white"
+            }`}
           />
 
           <button
             type="submit"
             disabled={sending || (!text.trim() && !imagePreview)}
-            className="rounded-full bg-pink-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-pink-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {sending ? "..." : "Kirim"}
           </button>
