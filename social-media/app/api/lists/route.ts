@@ -1,16 +1,15 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
-// GET: Mengambil semua list milik user
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get("userId");
+    const userId = await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "User ID is required" },
-        { status: 400 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
       );
     }
 
@@ -52,26 +51,33 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Membuat list baru
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const userId = await getSessionUserId();
 
-    const { name, description, isPrivate, ownerId } = body;
-
-    if (!name || !ownerId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Name and owner ID are required" },
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { name, description, isPrivate } = body;
+
+    if (typeof name !== "string" || !name.trim()) {
+      return NextResponse.json(
+        { success: false, message: "List name is required" },
         { status: 400 }
       );
     }
 
     const list = await prisma.list.create({
       data: {
-        name,
+        name: name.trim(),
         description: description || null,
         isPrivate: isPrivate ?? false,
-        ownerId,
+        ownerId: userId,
       },
     });
 
