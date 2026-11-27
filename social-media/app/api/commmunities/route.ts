@@ -1,5 +1,7 @@
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 export async function GET() {
   try {
@@ -43,22 +45,21 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-
-    const { name, description, image } = body;
-
-    const creatorId =
-      body.creatorId || process.env.NEXT_PUBLIC_TEST_USER_ID;
+    // Ambil ID dari akun yang sedang login
+    const creatorId = await getSessionUserId();
 
     if (!creatorId) {
       return NextResponse.json(
         {
           success: false,
-          message: "Creator ID is required",
+          message: "Please login first",
         },
-        { status: 400 }
+        { status: 401 }
       );
     }
+
+    const body = await request.json();
+    const { name, description, image } = body;
 
     if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
@@ -83,9 +84,25 @@ export async function POST(request: Request) {
     const community = await prisma.community.create({
       data: {
         name: name.trim(),
-        description: description?.trim() || null,
-        image: image?.trim() || null,
+        description:
+          typeof description === "string" && description.trim()
+            ? description.trim()
+            : null,
+        image:
+          typeof image === "string" && image.trim()
+            ? image.trim()
+            : null,
         creatorId,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
 

@@ -3,38 +3,28 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 
-type Context = {
+type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-// GET COMMUNITY DETAIL + POSTS + LIKE STATUS
 export async function GET(
   request: Request,
-  { params }: Context
+  { params }: RouteContext
 ) {
   try {
     const { id } = await params;
     const communityId = Number(id);
-
-    const userId =
-      (await getSessionUserId()) ||
-      process.env.NEXT_PUBLIC_TEST_USER_ID ||
-      "";
+    const userId = await getSessionUserId();
 
     if (!Number.isInteger(communityId) || communityId <= 0) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid community ID",
-        },
+        { success: false, message: "Invalid community ID" },
         { status: 400 }
       );
     }
 
     const community = await prisma.community.findUnique({
-      where: {
-        id: communityId,
-      },
+      where: { id: communityId },
       include: {
         creator: {
           select: {
@@ -45,8 +35,12 @@ export async function GET(
           },
         },
         members: {
+          select: { userId: true },
+        },
+        _count: {
           select: {
-            userId: true,
+            members: true,
+            posts: true,
           },
         },
         posts: {
@@ -60,12 +54,8 @@ export async function GET(
               },
             },
             likes: {
-              where: {
-                userId,
-              },
-              select: {
-                id: true,
-              },
+              where: { userId: userId ?? "" },
+              select: { userId: true },
             },
             _count: {
               select: {
@@ -74,79 +64,9 @@ export async function GET(
               },
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        _count: {
-          select: {
-            members: true,
-            posts: true,
-          },
+          orderBy: { createdAt: "desc" },
         },
       },
-    });
-
-    if (!community) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Community not found",
-        },
-        { status: 404 }
-      );
-    }
-
-    const formattedCommunity = {
-      ...community,
-      posts: community.posts.map((post) => {
-        const { likes, ...postData } = post;
-
-        return {
-          ...postData,
-          isLiked: likes.length > 0,
-        };
-      }),
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: formattedCommunity,
-    });
-  } catch (error) {
-    console.error("GET COMMUNITY DETAIL ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to fetch community detail",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// UPDATE COMMUNITY
-export async function PUT(
-  request: Request,
-  { params }: Context
-) {
-  try {
-    const { id } = await params;
-    const communityId = Number(id);
-
-    if (!Number.isInteger(communityId) || communityId <= 0) {
-      return NextResponse.json(
-        { success: false, message: "Invalid community ID" },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const { name, description, image, userId } = body;
-
-    const community = await prisma.community.findUnique({
-      where: { id: communityId },
     });
 
     if (!community) {
@@ -156,49 +76,50 @@ export async function PUT(
       );
     }
 
-    if (community.creatorId !== userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Only the creator can update this community",
-        },
-        { status: 403 }
-      );
-    }
+    const formattedCommunity = {
+      ...community,
 
-    const updatedCommunity = await prisma.community.update({
-      where: { id: communityId },
-      data: {
-        name,
-        description,
-        image,
-      },
-    });
+      // Cek apakah user yang login adalah creator komunitas
+      isCreator: Boolean(
+        userId && community.creatorId === userId
+      ),
+
+      posts: community.posts.map((post) => ({
+        ...post,
+        isLiked: post.likes.length > 0,
+        likes: undefined,
+      })),
+    };
 
     return NextResponse.json({
       success: true,
-      message: "Community updated successfully",
-      data: updatedCommunity,
+      currentUserId: userId,
+      data: formattedCommunity,
     });
   } catch (error) {
-    console.error("UPDATE COMMUNITY ERROR:", error);
+    console.error("GET Community Detail Error:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to update community",
-      },
+      { success: false, message: "Failed to fetch community details" },
       { status: 500 }
     );
   }
 }
 
-// DELETE COMMUNITY
-export async function DELETE(
+export async function PUT(
   request: Request,
-  { params }: Context
+  { params }: RouteContext
 ) {
   try {
+    const userId = await getSessionUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const communityId = Number(id);
 
@@ -209,7 +130,112 @@ export async function DELETE(
       );
     }
 
-    const { userId } = await request.json();
+    const existingCommunity = await prisma.community.findUnique({
+      where: { id: communityId },
+    });
+
+    if (!existingCommunity) {
+      return NextResponse.json(
+        { success: false, message: "Community not found" },
+        { status: 404 }
+      );
+    }
+
+    if (existingCommunity.creatorId !== userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Only the creator can edit this community",
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const { name, description, image } = body;
+
+    if (typeof name !== "string" || !name.trim()) {
+      return NextResponse.json(
+        { success: false, message: "Community name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (name.trim().length < 3) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Community name must be at least 3 characters",
+        },
+        { status: 400 }
+      );
+    }
+
+    const updatedCommunity = await prisma.community.update({
+      where: { id: communityId },
+      data: {
+        name: name.trim(),
+        description:
+          typeof description === "string" && description.trim()
+            ? description.trim()
+            : null,
+        image:
+          typeof image === "string" && image.trim()
+            ? image.trim()
+            : null,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Community updated successfully",
+      data: updatedCommunity,
+    });
+  } catch (error) {
+    console.error("PUT Community Error:", error);
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Community name already exists" },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, message: "Failed to update community" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: RouteContext
+) {
+  try {
+    const userId = await getSessionUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const communityId = Number(id);
+
+    if (!Number.isInteger(communityId) || communityId <= 0) {
+      return NextResponse.json(
+        { success: false, message: "Invalid community ID" },
+        { status: 400 }
+      );
+    }
 
     const community = await prisma.community.findUnique({
       where: { id: communityId },
@@ -232,8 +258,39 @@ export async function DELETE(
       );
     }
 
-    await prisma.community.delete({
-      where: { id: communityId },
+    await prisma.$transaction(async (tx) => {
+      const posts = await tx.post.findMany({
+        where: { communityId },
+        select: { id: true },
+      });
+
+      const postIds = posts.map((post) => post.id);
+
+      if (postIds.length > 0) {
+        await tx.postComment.deleteMany({
+          where: { postId: { in: postIds } },
+        });
+
+        await tx.postLike.deleteMany({
+          where: { postId: { in: postIds } },
+        });
+
+        await tx.bookmark.deleteMany({
+          where: { postId: { in: postIds } },
+        });
+
+        await tx.post.deleteMany({
+          where: { communityId },
+        });
+      }
+
+      await tx.communityMember.deleteMany({
+        where: { communityId },
+      });
+
+      await tx.community.delete({
+        where: { id: communityId },
+      });
     });
 
     return NextResponse.json({
@@ -241,13 +298,10 @@ export async function DELETE(
       message: "Community deleted successfully",
     });
   } catch (error) {
-    console.error("DELETE COMMUNITY ERROR:", error);
+    console.error("DELETE Community Error:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to delete community",
-      },
+      { success: false, message: "Failed to delete community" },
       { status: 500 }
     );
   }
