@@ -347,3 +347,40 @@
     width: 100%;
   }
 }
+
+.join-community-btn,
+.leave-community-btn {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.join-community-btn {
+  background: #e91e8c;
+  color: white;
+  border: 1px solid #e91e8c;
+}
+
+.join-community-btn:hover {
+  background: #c91675;
+}
+
+.leave-community-btn {
+  background: transparent;
+  color: #e91e8c;
+  border: 1px solid #e91e8c;
+}
+
+.leave-community-btn:hover {
+  background: #fff0f7;
+}
+
+.join-community-btn:disabled,
+.leave-community-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
