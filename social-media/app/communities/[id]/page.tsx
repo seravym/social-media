@@ -52,8 +52,6 @@ type Community = {
   };
 };
 
-const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID;
-
 function CommunityDetailContent() {
   const params = useParams<{ id: string }>();
   const communityId = params.id;
@@ -82,12 +80,11 @@ function CommunityDetailContent() {
   async function loadCommunity() {
     const [communityResponse, bookmarksResponse] = await Promise.all([
       fetch(`/api/commmunities/${communityId}`),
-      TEST_USER_ID
-        ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
-        : Promise.resolve(null),
+      fetch("/api/bookmarks"),
     ]);
 
     const communityResult = await communityResponse.json();
+    const bookmarksResult = await bookmarksResponse.json();
 
     if (!communityResponse.ok || !communityResult.success) {
       throw new Error(
@@ -97,17 +94,15 @@ function CommunityDetailContent() {
       );
     }
 
-    let bookmarkedIds: string[] = [];
-
-    if (bookmarksResponse) {
-      const bookmarksResult = await bookmarksResponse.json();
-
-      if (bookmarksResponse.ok && bookmarksResult.success) {
-        bookmarkedIds = bookmarksResult.data.map(
-          (bookmark: { id: string }) => bookmark.id
-        );
-      }
+    if (!bookmarksResponse.ok || !bookmarksResult.success) {
+      throw new Error(
+        bookmarksResult.message || "Failed to fetch bookmarks."
+      );
     }
+
+    const bookmarkedIds: string[] = bookmarksResult.data.map(
+      (bookmark: { id: string }) => bookmark.id
+    );
 
     const formattedCommunity: Community = {
       ...communityResult.data,
@@ -133,19 +128,18 @@ function CommunityDetailContent() {
           await Promise.all([
             fetch(`/api/commmunities/${communityId}`),
             fetch(`/api/commmunities/${communityId}/membership`),
-            TEST_USER_ID
-              ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
-              : Promise.resolve(null),
+            fetch("/api/bookmarks"),
           ]);
 
         const communityResult = await communityResponse.json();
         const membershipResult = await membershipResponse.json();
+        const bookmarksResult = await bookmarksResponse.json();
 
         if (!communityResponse.ok || !communityResult.success) {
           throw new Error(
             communityResult.message ||
               communityResult.error ||
-              `Failed to fetch community (${communityResponse.status})`
+              "Failed to fetch community."
           );
         }
 
@@ -153,21 +147,19 @@ function CommunityDetailContent() {
           throw new Error(
             membershipResult.message ||
               membershipResult.error ||
-              `Failed to check membership (${membershipResponse.status})`
+              "Failed to check membership."
           );
         }
 
-        let bookmarkedIds: string[] = [];
-
-        if (bookmarksResponse) {
-          const bookmarksResult = await bookmarksResponse.json();
-
-          if (bookmarksResponse.ok && bookmarksResult.success) {
-            bookmarkedIds = bookmarksResult.data.map(
-              (bookmark: { id: string }) => bookmark.id
-            );
-          }
+        if (!bookmarksResponse.ok || !bookmarksResult.success) {
+          throw new Error(
+            bookmarksResult.message || "Failed to fetch bookmarks."
+          );
         }
+
+        const bookmarkedIds: string[] = bookmarksResult.data.map(
+          (bookmark: { id: string }) => bookmark.id
+        );
 
         if (!ignore) {
           const formattedCommunity: Community = {
@@ -213,12 +205,6 @@ function CommunityDetailContent() {
         `/api/commmunities/${community.id}/membership`,
         {
           method: isJoined ? "DELETE" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: TEST_USER_ID,
-          }),
         }
       );
 
@@ -273,7 +259,6 @@ function CommunityDetailContent() {
         body: JSON.stringify({
           content: postContent.trim(),
           communityId: community.id,
-          userId: TEST_USER_ID,
         }),
       });
 
@@ -298,7 +283,7 @@ function CommunityDetailContent() {
 
   // LIKE / UNLIKE POST
   async function handleLike(postId: string) {
-    if (!TEST_USER_ID || likingPosts.includes(postId)) return;
+    if (likingPosts.includes(postId)) return;
 
     setLikingPosts((previous) => [...previous, postId]);
     setError("");
@@ -309,9 +294,7 @@ function CommunityDetailContent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          userId: TEST_USER_ID,
-        }),
+        body: JSON.stringify({}),
       });
 
       const result = await response.json();
@@ -357,7 +340,7 @@ function CommunityDetailContent() {
 
   // SAVE / REMOVE BOOKMARK
   async function handleBookmark(postId: string) {
-    if (!TEST_USER_ID || bookmarkingPosts.includes(postId)) return;
+    if (bookmarkingPosts.includes(postId)) return;
 
     const post = community?.posts.find((item) => item.id === postId);
     if (!post) return;
@@ -367,7 +350,7 @@ function CommunityDetailContent() {
     try {
       const response = post.isBookmarked
         ? await fetch(
-            `/api/bookmarks?postId=${encodeURIComponent(postId)}&userId=${encodeURIComponent(TEST_USER_ID)}`,
+            `/api/bookmarks?postId=${encodeURIComponent(postId)}`,
             { method: "DELETE" }
           )
         : await fetch("/api/bookmarks", {
@@ -375,10 +358,7 @@ function CommunityDetailContent() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              postId,
-              userId: TEST_USER_ID,
-            }),
+            body: JSON.stringify({ postId }),
           });
 
       const result = await response.json();
@@ -470,7 +450,7 @@ function CommunityDetailContent() {
   ) {
     event.preventDefault();
 
-    if (!TEST_USER_ID || sendingComments.includes(postId)) return;
+    if (sendingComments.includes(postId)) return;
 
     const content = (commentInputs[postId] || "").trim();
     if (!content) return;
@@ -483,10 +463,7 @@ function CommunityDetailContent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          content,
-          userId: TEST_USER_ID,
-        }),
+        body: JSON.stringify({ content }),
       });
 
       const result = await response.json();
