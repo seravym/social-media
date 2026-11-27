@@ -131,6 +131,7 @@ export default function HomePage() {
           <li><Link href="/follow">Follow</Link></li>
           <li><Link href="/notifications">Notifications</Link></li>
           <li><Link href="/login">Login</Link></li>
+          <li><Link href="/conversations">Chat</Link></li>
         </ul>
       </nav>
 

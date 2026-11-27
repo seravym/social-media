@@ -215,6 +215,25 @@ export default function ConversationsPage() {
     }
   };
 
+  const handleCreateGroup = async (name: string, memberIds: string[]) => {
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "group", name, memberIds }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      await loadConversations();
+      if (data.conversationId) {
+        handleSelectChat(data.conversationId);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleTogglePin = (id: string) => {
     setPinnedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
@@ -249,6 +268,9 @@ export default function ConversationsPage() {
         senderId: "self",
         body,
         imageUrl,
+        isForwarded: false,
+        editedAt: null,
+        deletedAt: null,
         createdAt: new Date().toISOString(),
       };
       setSelfMessages((prev) => {
@@ -271,6 +293,9 @@ export default function ConversationsPage() {
       senderId: currentUserId,
       body,
       imageUrl,
+      isForwarded: false,
+      editedAt: null,
+      deletedAt: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -356,8 +381,151 @@ export default function ConversationsPage() {
     }
   };
 
-  const originalDisplayName =
-    detail?.other?.displayName || selectedChat?.other?.displayName || "User";
+  const handleEditMessage = async (messageId: string, body: string) => {
+    if (isSelfNotes) {
+      setSelfMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === messageId
+            ? { ...m, body, editedAt: new Date().toISOString() }
+            : m,
+        );
+        try {
+          localStorage.setItem(SELF_NOTES_KEY, JSON.stringify(next));
+        } catch {
+          return next;
+        }
+        return next;
+      });
+      return true;
+    }
+
+    if (!selectedId) return false;
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedId}/messages/${messageId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        },
+      );
+      if (!res.ok) return false;
+      const updated = (await res.json()) as ChatMessageDto;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? updated : m)),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (isSelfNotes) {
+      setSelfMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === messageId
+            ? { ...m, deletedAt: new Date().toISOString() }
+            : m,
+        );
+        try {
+          localStorage.setItem(SELF_NOTES_KEY, JSON.stringify(next));
+        } catch {
+          return next;
+        }
+        return next;
+      });
+      return true;
+    }
+
+    if (!selectedId) return false;
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedId}/messages/${messageId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) return false;
+      const updated = (await res.json()) as ChatMessageDto;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? updated : m)),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleForwardMessage = async (
+    conversationId: string,
+    message: ChatMessageDto,
+  ) => {
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: message.body,
+          imageUrl: message.imageUrl,
+          isForwarded: true,
+        }),
+      });
+      if (!res.ok) return false;
+      const created = (await res.json()) as ChatMessageDto;
+      if (conversationId === selectedIdRef.current) {
+        setMessages((prev) => [...prev, created]);
+      }
+      void loadConversations();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) return false;
+
+      setConversations((prev) =>
+        prev.filter((c) => c.id !== conversationId),
+      );
+
+      if (selectedIdRef.current === conversationId) {
+        selectedIdRef.current = null;
+        setSelectedId(null);
+        setDetail(null);
+        setMessages([]);
+        setHasMore(false);
+        setChatError(null);
+        setSendError(null);
+      }
+
+      setDrawerMode(null);
+      setPreviewSettings(null);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isGroup =
+    !isSelfNotes &&
+    (detail?.type === "group" || selectedChat?.type === "group");
+
+  const senderMap = Object.fromEntries(
+    (detail?.members ?? []).map((m) => [
+      m.user.id,
+      m.nickname || m.user.displayName,
+    ]),
+  );
+
+  const originalDisplayName = isGroup
+    ? detail?.name || selectedChat?.name || "Grup"
+    : detail?.other?.displayName || selectedChat?.other?.displayName || "User";
   const savedNickname = isSelfNotes
     ? null
     : (detail?.nickname ?? selectedChat?.nickname ?? null);
@@ -374,13 +542,18 @@ export default function ConversationsPage() {
 
   const activeName = isSelfNotes
     ? "Catatan Pribadi"
-    : effectiveNickname || originalDisplayName;
+    : isGroup
+      ? originalDisplayName
+      : effectiveNickname || originalDisplayName;
   const activeSubtitle = isSelfNotes
     ? "Tersimpan di perangkat ini"
-    : `@${detail?.other?.username || selectedChat?.other?.username || "user"}`;
-  const activeAvatar = isSelfNotes
-    ? null
-    : (detail?.other?.avatarUrl ?? selectedChat?.other?.avatarUrl ?? null);
+    : isGroup
+      ? `${detail?.members.length ?? 0} anggota`
+      : `@${detail?.other?.username || selectedChat?.other?.username || "user"}`;
+  const activeAvatar =
+    isSelfNotes || isGroup
+      ? null
+      : (detail?.other?.avatarUrl ?? selectedChat?.other?.avatarUrl ?? null);
   const activeMessages = isSelfNotes ? selfMessages : messages;
 
   const displayConversations = conversations.map((c) =>
@@ -405,6 +578,7 @@ export default function ConversationsPage() {
           pinnedIds={pinnedIds}
           onSelectChat={handleSelectChat}
           onStartChat={handleStartChat}
+          onCreateGroup={handleCreateGroup}
           onTogglePin={handleTogglePin}
           onReplyNote={handleReplyNote}
         />
@@ -443,12 +617,15 @@ export default function ConversationsPage() {
                 avatarUrl={activeAvatar}
                 currentUserId={currentUserId}
                 isSelfNotes={isSelfNotes}
+                isGroup={isGroup}
+                senderMap={senderMap}
                 loading={loadingChat}
                 messages={activeMessages}
                 hasMore={isSelfNotes ? false : hasMore}
                 loadingMore={loadingMore}
                 error={isSelfNotes ? null : chatError}
                 sendError={sendError ? "Pesan gagal terkirim." : null}
+                conversations={displayConversations}
                 background={effectiveBackground}
                 vanishMode={vanishMode}
                 initialDraft={replyDraft}
@@ -456,6 +633,9 @@ export default function ConversationsPage() {
                 onLoadMore={handleLoadMore}
                 onRetryLoad={handleRetryLoad}
                 onRetrySend={handleRetrySend}
+                onEditMessage={handleEditMessage}
+                onDeleteMessage={handleDeleteMessage}
+                onForwardMessage={handleForwardMessage}
                 onBack={() => {
                   setSelectedId(null);
                   setDrawerMode(null);
@@ -487,6 +667,7 @@ export default function ConversationsPage() {
                   onToggleVanish={setVanishMode}
                   onPreviewChange={setPreviewSettings}
                   onSaveSettings={handleSaveSettings}
+                  onDeleteConversation={handleDeleteConversation}
                   onClose={handleCloseDrawer}
                 />
               )}

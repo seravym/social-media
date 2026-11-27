@@ -58,6 +58,9 @@ export const GET = authed(async (user) => {
             senderId: lastMsg.senderId,
             body: lastMsg.body,
             imageUrl: lastMsg.imageUrl,
+            isForwarded: lastMsg.isForwarded,
+            editedAt: lastMsg.editedAt ? lastMsg.editedAt.toISOString() : null,
+            deletedAt: lastMsg.deletedAt ? lastMsg.deletedAt.toISOString() : null,
             createdAt: lastMsg.createdAt.toISOString(),
           }
         : null,

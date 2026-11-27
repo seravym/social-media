@@ -15,6 +15,9 @@ function toMessageDto(message: {
   senderId: string;
   body: string;
   imageUrl: string | null;
+  isForwarded: boolean;
+  editedAt: Date | null;
+  deletedAt: Date | null;
   createdAt: Date;
 }): ChatMessageDto {
   return {
@@ -22,6 +25,9 @@ function toMessageDto(message: {
     senderId: message.senderId,
     body: message.body,
     imageUrl: message.imageUrl,
+    isForwarded: message.isForwarded,
+    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
+    deletedAt: message.deletedAt ? message.deletedAt.toISOString() : null,
     createdAt: message.createdAt.toISOString(),
   };
 }
@@ -38,6 +44,7 @@ const messageSchema = z
       })
       .nullable()
       .optional(),
+    isForwarded: z.boolean().optional(),
   })
   .refine(
     (data) => data.body.length > 0 || Boolean(data.imageUrl && data.imageUrl.length > 0),
@@ -152,6 +159,7 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
           senderId: user.id,
           body: parsed.data.body,
           imageUrl: normalizedImageUrl,
+          isForwarded: parsed.data.isForwarded ?? false,
         },
       }),
       prisma.conversation.update({

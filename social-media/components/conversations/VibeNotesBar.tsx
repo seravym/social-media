@@ -98,7 +98,7 @@ export function VibeNotesBar({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={40}
-            placeholder="Tulis vibe note..."
+            placeholder="Tulis catatan suasana..."
             className="flex-1 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
           />
           <button
