@@ -1,8 +1,8 @@
 
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import "./detail.css";
 
@@ -43,7 +43,7 @@ type Community = {
   };
 };
 
-export default function CommunityDetailPage() {
+function CommunityDetailContent() {
   const params = useParams<{ id: string }>();
   const communityId = params.id;
 
@@ -57,13 +57,14 @@ export default function CommunityDetailPage() {
     let ignore = false;
 
     async function loadData() {
+      setLoading(true);
+      setError("");
+
       try {
         const [communityResponse, membershipResponse] =
           await Promise.all([
             fetch(`/api/commmunities/${communityId}`),
-            fetch(
-              `/api/commmunities/${communityId}/membership`
-            ),
+            fetch(`/api/commmunities/${communityId}/membership`),
           ]);
 
         const communityResult = await communityResponse.json();
@@ -71,13 +72,17 @@ export default function CommunityDetailPage() {
 
         if (!communityResponse.ok || !communityResult.success) {
           throw new Error(
-            communityResult.message || "Failed to fetch community"
+            communityResult.message ||
+              communityResult.error ||
+              `Failed to fetch community (${communityResponse.status})`
           );
         }
 
-        if (!membershipResponse.ok) {
+        if (!membershipResponse.ok || !membershipResult.success) {
           throw new Error(
-            membershipResult.message || "Failed to check membership"
+            membershipResult.message ||
+              membershipResult.error ||
+              `Failed to check membership (${membershipResponse.status})`
           );
         }
 
@@ -131,7 +136,9 @@ export default function CommunityDetailPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.message || "Failed to update membership"
+          result.message ||
+            result.error ||
+            "Failed to update membership"
         );
       }
 
@@ -203,10 +210,7 @@ export default function CommunityDetailPage() {
         <section className="detail-community-header">
           <div className="detail-community-image">
             {community.image ? (
-              <img
-                src={community.image}
-                alt={community.name}
-              />
+              <img src={community.image} alt={community.name} />
             ) : (
               <span>🌷</span>
             )}
@@ -222,13 +226,8 @@ export default function CommunityDetailPage() {
             </p>
 
             <div className="detail-meta">
-              <span>
-                👥 {community._count.members} members
-              </span>
-
-              <span>
-                📝 {community._count.posts} posts
-              </span>
+              <span>👥 {community._count.members} members</span>
+              <span>📝 {community._count.posts} posts</span>
             </div>
 
             <p className="detail-creator">
@@ -242,9 +241,7 @@ export default function CommunityDetailPage() {
             <button
               type="button"
               className={
-                isJoined
-                  ? "detail-leave-btn"
-                  : "detail-join-btn"
+                isJoined ? "detail-leave-btn" : "detail-join-btn"
               }
               onClick={handleMembership}
               disabled={processing}
@@ -287,10 +284,7 @@ export default function CommunityDetailPage() {
                       />
                     ) : (
                       <div className="detail-avatar-placeholder">
-                        {(
-                          post.author.name ||
-                          post.author.username
-                        )
+                        {(post.author.name || post.author.username)
                           .charAt(0)
                           .toUpperCase()}
                       </div>
@@ -298,10 +292,8 @@ export default function CommunityDetailPage() {
 
                     <div>
                       <strong>
-                        {post.author.name ||
-                          post.author.username}
+                        {post.author.name || post.author.username}
                       </strong>
-
                       <span>@{post.author.username}</span>
                     </div>
                   </div>
@@ -323,5 +315,19 @@ export default function CommunityDetailPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function CommunityDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="community-detail-page">
+          <p className="detail-loading">Loading community...</p>
+        </div>
+      }
+    >
+      <CommunityDetailContent />
+    </Suspense>
   );
 }
