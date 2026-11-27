@@ -1,123 +1,84 @@
-
-datasource db {
-  provider = "postgresql"
-}
-
 generator client {
   provider = "prisma-client"
   output   = "../generated"
 }
 
-// USER
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  username  String   @unique
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  passwordHash  String?
-  emailVerified DateTime?
-  otpCodes      OtpCode[]
-  bio       String?
-  phone     String?
-  birthDate DateTime?
-  settings UserSettings?
-
-  // NOTIFICATION
-  receivedNotifications Notification[] @relation("ReceivedNotifications")
-  sentNotifications     Notification[] @relation("SentNotifications")
-
-  // CHAT
-  conversations ConversationMember[]
-  messages      Message[]
-
-  // COMMUNITIES
-  createdCommunities   Community[]
-  communityMemberships CommunityMember[]
-
-  // LISTS
-  createdLists    List[]       @relation("ListOwner")
-  listMemberships ListMember[]
-
-  // ARTICLES
-  articles         Article[]        @relation("ArticleAuthor")
-  articleComments  ArticleComment[] @relation("ArticleCommentAuthor")
-  articleLikes     ArticleLike[]
-  articleBookmarks ArticleBookmark[]
-
-  // BOOKMARK
-  bookmarks Bookmark[]
-
-  // POSTS
-  posts        Post[]        @relation("PostAuthor")
-  postComments PostComment[] @relation("PostCommentAuthor")
-  postLikes    PostLike[]
-
-  // FOLLOWS
-  following Follow[] @relation("UserFollowing")
-  followers Follow[] @relation("UserFollowers")
+datasource db {
+  provider = "postgresql"
 }
 
-// COMMUNITIES
+model User {
+  id                    String               @id @default(cuid())
+  email                 String               @unique
+  name                  String?
+  username              String               @unique
+  avatarUrl             String?
+  createdAt             DateTime             @default(now())
+  articles              Article[]            @relation("ArticleAuthor")
+  articleBookmarks      ArticleBookmark[]
+  articleComments       ArticleComment[]     @relation("ArticleCommentAuthor")
+  articleLikes          ArticleLike[]
+  bookmarks             Bookmark[]
+  createdCommunities    Community[]
+  communityMemberships  CommunityMember[]
+  conversations         ConversationMember[]
+  createdLists          List[]               @relation("ListOwner")
+  listMemberships       ListMember[]
+  messages              Message[]
+  sentNotifications     Notification[]       @relation("SentNotifications")
+  receivedNotifications Notification[]       @relation("ReceivedNotifications")
+  userSettings UserSettings?
+}
+
 model Community {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
+  id          Int               @id @default(autoincrement())
+  name        String            @unique
   description String?
   image       String?
   creatorId   String
-  createdAt   DateTime @default(now())
-
-  creator User @relation(fields: [creatorId], references: [id])
-  members CommunityMember[]
-  posts   Post[]
+  createdAt   DateTime          @default(now())
+  creator     User              @relation(fields: [creatorId], references: [id])
+  members     CommunityMember[]
 }
 
-// COMMUNITY MEMBERS
 model CommunityMember {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   userId      String
   communityId Int
-  joinedAt    DateTime @default(now())
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, communityId])
 }
 
-// LISTS
 model List {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
   description String?
-  isPrivate   Boolean  @default(false)
+  isPrivate   Boolean      @default(false)
   ownerId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  owner   User         @relation("ListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members ListMember[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  owner       User         @relation("ListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     ListMember[]
 
   @@index([ownerId, createdAt])
   @@index([isPrivate, createdAt])
 }
 
-// LIST MEMBERS
 model ListMember {
-  id        Int      @id @default(autoincrement())
-  listId    Int
-  userId    String
-  addedAt   DateTime @default(now())
-
-  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      Int      @id @default(autoincrement())
+  listId  Int
+  userId  String
+  addedAt DateTime @default(now())
+  list    List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([listId, userId])
   @@index([userId])
 }
 
-// NOTIFICATION
 model Notification {
   id        String   @id @default(cuid())
   userId    String
@@ -127,74 +88,62 @@ model Notification {
   message   String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  user  User  @relation("ReceivedNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  actor User? @relation("SentNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+  actor     User?    @relation("SentNotifications", fields: [actorId], references: [id])
+  user      User     @relation("ReceivedNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
 }
 
-// CHAT
 model Conversation {
-  id         String   @id @default(cuid())
-  type       String
-  name       String?
-  background String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  members  ConversationMember[]
-  messages Message[]
+  id        String               @id @default(cuid())
+  type      String
+  name      String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   ConversationMember[]
+  messages  Message[]
 }
 
 model ConversationMember {
   conversationId String
   userId         String
-  nickname       String?
-  status         String   @default("active")
-  lastReadAt     DateTime @default(now())
-  joinedAt       DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String       @default("active")
+  lastReadAt     DateTime     @default(now())
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([conversationId, userId])
   @@index([userId, status])
 }
 
 model Message {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   senderId       String
-  body           String   @default("")
-  imageUrl       String?
-  createdAt      DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
 }
 
-// ARTICLES
 model Article {
-  id            String   @id @default(cuid())
+  id            String            @id @default(cuid())
   authorId      String
   title         String
   content       String
   coverImageUrl String?
-  status        String   @default("published")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status        String            @default("published")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   publishedAt   DateTime?
-  category String @default("Technology")
-  views    Int    @default(0)
-
-  author    User             @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  comments  ArticleComment[]
-  likes     ArticleLike[]
-  bookmarks ArticleBookmark[]
+  author        User              @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  bookmarks     ArticleBookmark[]
+  comments      ArticleComment[]
+  likes         ArticleLike[]
 
   @@index([authorId, createdAt])
   @@index([status, publishedAt])
@@ -207,9 +156,8 @@ model ArticleComment {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([articleId, createdAt])
   @@index([userId])
@@ -220,9 +168,8 @@ model ArticleLike {
   articleId String
   userId    String
   createdAt DateTime @default(now())
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, userId])
   @@index([userId])
@@ -233,113 +180,48 @@ model ArticleBookmark {
   articleId String
   userId    String
   createdAt DateTime @default(now())
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, userId])
   @@index([userId, createdAt])
 }
-
-model UserSettings {
-  userId String @id
-
-  theme    String @default("light")
-  fontSize String @default("medium")
-  language String @default("id")
-
-  protectPosts      Boolean @default(false)
-  allowPhotoTag     Boolean @default(true)
-  showInSuggestions Boolean @default(true)
-  whoCanReply       String  @default("everyone")
-  whoCanTag         String  @default("everyone")
-  whoCanMessage     String  @default("everyone")
-
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 
 model Bookmark {
   id        Int      @id @default(autoincrement())
   postId    String
   userId    String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
   @@index([userId, createdAt])
 }
 
-model OtpCode {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  codeHash  String
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([userId])
+model playing_with_neon {
+  id    Int    @id @default(autoincrement())
+  name  String
+  value Float? @db.Real
 }
 
-model Post {
-  id          String   @id @default(cuid())
-  authorId    String
-  communityId Int?
-  content     String
-  views       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model UserSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
 
-  author    User      @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  community Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
-  comments  PostComment[]
-  likes     PostLike[]
+  theme             String   @default("light")
+  fontSize          String   @default("medium")
+  language          String   @default("id")
 
-  @@index([authorId, createdAt])
-  @@index([communityId, createdAt])
-}
+  protectPosts      Boolean  @default(false)
+  allowPhotoTag     Boolean  @default(true)
+  showInSuggestions Boolean  @default(true)
 
-model PostComment {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  content   String
-  createdAt DateTime @default(now())
+  whoCanReply       String   @default("everyone")
+  whoCanTag         String   @default("everyone")
+  whoCanMessage     String   @default("everyone")
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation("PostCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  @@index([postId, createdAt])
-  @@index([userId])
-}
-
-model PostLike {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, userId])
-  @@index([userId])
-}
-
-model Follow {
-  id          String   @id @default(cuid())
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
-
-  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
