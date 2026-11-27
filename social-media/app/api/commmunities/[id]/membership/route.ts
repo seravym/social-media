@@ -1,14 +1,11 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
-
-function getUserId(body?: { userId?: string }) {
-  return body?.userId || process.env.NEXT_PUBLIC_TEST_USER_ID;
-}
 
 // CHECK MEMBERSHIP
 export async function GET(
@@ -18,21 +15,18 @@ export async function GET(
   try {
     const { id } = await params;
     const communityId = Number(id);
+    const userId = await getSessionUserId();
 
-    const userId =
-      new URL(request.url).searchParams.get("userId") ||
-      process.env.NEXT_PUBLIC_TEST_USER_ID;
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
 
     if (!Number.isInteger(communityId) || communityId <= 0) {
       return NextResponse.json(
         { success: false, message: "Invalid community ID" },
-        { status: 400 }
-      );
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "User ID is required" },
         { status: 400 }
       );
     }
@@ -68,20 +62,18 @@ export async function POST(
   try {
     const { id } = await params;
     const communityId = Number(id);
+    const userId = await getSessionUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
 
     if (!Number.isInteger(communityId) || communityId <= 0) {
       return NextResponse.json(
         { success: false, message: "Invalid community ID" },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const userId = getUserId(body);
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "User ID is required" },
         { status: 400 }
       );
     }
@@ -134,20 +126,18 @@ export async function DELETE(
   try {
     const { id } = await params;
     const communityId = Number(id);
+    const userId = await getSessionUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
 
     if (!Number.isInteger(communityId) || communityId <= 0) {
       return NextResponse.json(
         { success: false, message: "Invalid community ID" },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const userId = getUserId(body);
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "User ID is required" },
         { status: 400 }
       );
     }
