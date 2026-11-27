@@ -1,63 +1,23 @@
-
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { authed, json } from "@/lib/route";
 
-type Context = {
-    params: Promise<{ id: string }>;
-};
+type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(
-request: NextRequest,
-{ params }: Context
-) {
-try {
-const { id } = await params;
-const { userId } = await request.json();
+export const POST = authed<Ctx>(async (me, _req, { params }) => {
+    const { id } = await params;
 
-if (!userId) {
-    return NextResponse.json(
-    { error: "userId wajib diisi" },
-    { status: 400 }
-    );
-}
+    const article = await prisma.article.findUnique({ where: { id }, select: { id: true } });
+    if (!article) return json({ error: "Artikel tidak ditemukan" }, 404);
 
-const article = await prisma.article.findUnique({
-    where: { id },
-});
-
-if (!article) {
-    return NextResponse.json(
-    { error: "Artikel tidak ditemukan" },
-    { status: 404 }
-    );
-}
-
-const existing = await prisma.articleBookmark.findUnique({
-    where: {
-    articleId_userId: {
-        articleId: id,
-        userId,
-    },
-    },
-});
-
-if (existing) {
-    await prisma.articleBookmark.delete({
-    where: { id: existing.id },
+    const existing = await prisma.articleBookmark.findFirst({
+        where: { userId: me.id, articleId: id },
     });
 
-    return NextResponse.json({ bookmarked: false });
-}
+    if (existing) {
+        await prisma.articleBookmark.deleteMany({ where: { userId: me.id, articleId: id } });
+    } else {
+        await prisma.articleBookmark.create({ data: { userId: me.id, articleId: id } });
+    }
 
-await prisma.articleBookmark.create({
-    data: { articleId: id, userId },
+    return json({ saved: !existing });
 });
-
-return NextResponse.json({ bookmarked: true });
-} catch (error) {
-return NextResponse.json(
-    { error: "Gagal memproses bookmark" },
-    { status: 500 }
-);
-}
-}

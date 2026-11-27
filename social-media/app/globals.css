@@ -130,3 +130,11 @@ body {
 .signup-link {
   text-decoration: underline;
 }
+
+html[data-theme="dark"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+html[data-theme="dark"] img,
+html[data-theme="dark"] video {
+  filter: invert(1) hue-rotate(180deg);
+}
