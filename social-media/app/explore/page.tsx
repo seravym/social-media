@@ -6,6 +6,16 @@ import Link from "next/link";
 type News = { id: string; title: string; summary: string; category: string; postCount: number; createdAt: string };
 type Trend = { id: string; name: string; category: string; postCount: number };
 type Account = { id: string; name: string | null; username: string };
+type Post = {
+    id: string;
+    content: string;
+    category: string;
+    replyCount: number;
+    likeCount: number;
+    views: number;
+    createdAt: string;
+    author: Account;
+};
 type HistoryItem = { id: string; query: string };
 
 const TABS = ["Explore", "Trending", "News", "Sports", "Entertainment"] as const;
@@ -44,11 +54,20 @@ function Highlight({ text, query }: { text: string; query: string }) {
     );
 }
 
+function Avatar({ name }: { name: string }) {
+    return (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
+        {name.charAt(0).toUpperCase()}
+        </div>
+    );
+}
+
 export default function ExplorePage() {
     const [tab, setTab] = useState<Tab>("Explore");
     const [query, setQuery] = useState("");
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
+    const [posts, setPosts] = useState<Post[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [focused, setFocused] = useState(false);
@@ -59,7 +78,7 @@ export default function ExplorePage() {
         if (res.ok) setHistory(await res.json());
     }
 
-        useEffect(() => {
+    useEffect(() => {
         let cancelled = false;
         (async () => {
         const res = await fetch("/api/explore/history");
@@ -70,6 +89,7 @@ export default function ExplorePage() {
         };
     }, []);
 
+    // pencarian langsung (jeda 300 ms)
     useEffect(() => {
         const timer = setTimeout(async () => {
         setLoading(true);
@@ -79,6 +99,7 @@ export default function ExplorePage() {
             const data = await res.json();
             setNews(data.news);
             setTrending(data.trending);
+            setPosts(data.posts);
             setAccounts(data.accounts);
             }
         } finally {
@@ -108,18 +129,29 @@ export default function ExplorePage() {
         setHistory([]);
     }
 
+    // filter per tab
     const byCategory = <T extends { category: string }>(list: T[]) =>
         tab === "Explore" || tab === "Trending" ? list : list.filter((i) => i.category === tab);
 
+    const searching = query.trim().length > 0;
+    const compact = tab === "Explore" && !searching; // ringkas di tab Explore tanpa pencarian
+
     const shownNews = tab === "Trending" ? [] : byCategory(news);
     const allTrending = byCategory(trending);
-    const shownTrending = tab === "Explore" && !query.trim() ? allTrending.slice(0, 5) : allTrending;
-    const searching = query.trim().length > 0;
+    const shownTrending = compact ? allTrending.slice(0, 5) : allTrending;
+    const allPosts = tab === "Trending" ? [] : byCategory(posts);
+    const shownPosts = compact ? allPosts.slice(0, 5) : allPosts;
+    const showAccounts = (tab === "Explore" || searching) && accounts.length > 0;
+
     const nothing =
-        !loading && !shownNews.length && !shownTrending.length && !(searching && accounts.length);
+        !loading &&
+        !shownNews.length &&
+        !shownTrending.length &&
+        !shownPosts.length &&
+        !showAccounts;
 
     const section = (title: string, children: React.ReactNode) => (
-        <section className="mb-6">
+        <section className="mb-8">
         <h2 className="mb-3 text-xl font-bold">{title}</h2>
         {children}
         </section>
@@ -127,6 +159,7 @@ export default function ExplorePage() {
 
     return (
         <main className="mx-auto w-full max-w-4xl px-6 py-8">
+        {/* pencarian */}
         <div className="relative mb-4 flex items-center gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
@@ -138,11 +171,12 @@ export default function ExplorePage() {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 onKeyDown={(e) => e.key === "Enter" && saveSearch(query)}
-                placeholder="Cari topik, akun, atau berita"
+                placeholder="Cari topik, akun, atau postingan"
                 className="w-full rounded-full bg-gray-100 px-5 py-3 text-base outline-none focus:bg-white focus:ring-2 focus:ring-pink-400"
             />
 
             {focused && !searching && history.length > 0 && (
+                // onMouseDown mencegah input kehilangan fokus sebelum klik terproses
                 <div
                 onMouseDown={(e) => e.preventDefault()}
                 className="absolute left-0 right-0 top-full z-10 mt-2 rounded-xl border border-gray-200 bg-white shadow-lg"
@@ -178,6 +212,7 @@ export default function ExplorePage() {
             </div>
         </div>
 
+        {/* tab */}
         <div className="mb-6 flex border-b border-gray-200">
             {TABS.map((t) => (
             <button
@@ -223,9 +258,7 @@ export default function ExplorePage() {
                     <li key={t.id} className="flex gap-4 border-b border-gray-100 pb-3">
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
                         <div>
-                        <p className="text-sm text-gray-500">
-                            {t.category} · Trending di Indonesia
-                        </p>
+                        <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
                         <p className="text-base font-bold">
                             <Highlight text={t.name} query={query} />
                         </p>
@@ -236,22 +269,48 @@ export default function ExplorePage() {
                 </ol>
                 )}
 
-            {searching &&
-                accounts.length > 0 &&
+            {showAccounts &&
                 section(
                 "Akun untuk diikuti",
                 <ul className="space-y-3">
                     {accounts.map((a) => (
                     <li key={a.id} className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
-                        {(a.name ?? a.username).charAt(0).toUpperCase()}
-                        </div>
+                        <Avatar name={a.name ?? a.username} />
                         <div>
                         <p className="text-base font-bold">
                             <Highlight text={a.name ?? a.username} query={query} />
                         </p>
                         <p className="text-sm text-gray-500">
                             @<Highlight text={a.username} query={query} />
+                        </p>
+                        </div>
+                    </li>
+                    ))}
+                </ul>
+                )}
+
+            {shownPosts.length > 0 &&
+                section(
+                "Postingan populer",
+                <ul className="space-y-4">
+                    {shownPosts.map((p) => (
+                    <li key={p.id} className="flex gap-3 border-b border-gray-100 pb-4">
+                        <Avatar name={p.author.name ?? p.author.username} />
+                        <div className="min-w-0">
+                        <p className="text-sm text-gray-500">
+                            <span className="text-base font-bold text-gray-900">
+                            <Highlight text={p.author.name ?? p.author.username} query={query} />
+                            </span>{" "}
+                            @{p.author.username} · {timeAgo(p.createdAt)} ·{" "}
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                            {p.category}
+                            </span>
+                        </p>
+                        <p className="mt-1 text-base">
+                            <Highlight text={p.content} query={query} />
+                        </p>
+                        <p className="mt-2 text-sm text-gray-500">
+                            💬 {p.replyCount} · ♡ {p.likeCount} · 📊 {p.views}
                         </p>
                         </div>
                     </li>
