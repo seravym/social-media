@@ -307,7 +307,7 @@ model News {
   id        String   @id @default(cuid())
   title     String
   summary   String
-  category  String // News | Sports | Entertainment
+  category  String
   postCount Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -317,7 +317,7 @@ model News {
 model TrendingTopic {
   id        String @id @default(cuid())
   name      String @unique
-  category  String // News | Sports | Entertainment
+  category  String
   postCount Int    @default(0)
 
   @@index([category, postCount])
@@ -420,7 +420,7 @@ model Follow {
 model ExplorePost {
   id         String   @id @default(cuid())
   content    String
-  category   String   // News | Sports | Entertainment
+  category   String
   replyCount Int      @default(0)
   likeCount  Int      @default(0)
   views      Int      @default(0)
