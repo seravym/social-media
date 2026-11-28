@@ -1,6 +1,20 @@
+"use client"
 import "./profile.css";
+import { useState } from "react";
 
 export default function ProfilePage() {
+    const [isEditOpen, setIsEditOpen] = useState(false);
+
+    const [displayName, setDisplayName] = useState("Nama Akun");
+    const [username, setUsername] = useState("@username");
+    const [bio,setBio] = useState ("")
+
+const [draftName, setDraftName] = useState(displayName);
+  const [draftUsername, setDraftUsername] = useState(username);
+  const [draftBio, setDraftBio] = useState(bio);
+
+
+
   return (
     <div className="profile-layout">
       <main className="profile-page">
@@ -34,7 +48,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="profile-actions">
-              <button type="button">Edit Profile</button>
+              <button type="button" onClick={() => setIsEditOpen(true)}>Edit Profile</button>
               <button type="button">Share</button>
             </div>
           </div>
