@@ -140,7 +140,21 @@ export default function ProfilePage() {
     </div>
 )}
 
-
+<div className = "edit-banner-box">
+    <img
+    src = "/banner.jpg"
+    alt = "Ma Banner well"
+    className = "edit-banner-img"
+    />
+    <div className = "edit-banner-actions">
+        <button type = "button" className="edit-icon-btn">
+            🎀📸
+        </button>
+    <button type = "button" className = "edit-icon-btn">
+             ✦
+    </button>
+    </div>
+</div>
 
     </div>
   );
