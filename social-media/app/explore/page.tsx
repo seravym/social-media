@@ -78,6 +78,8 @@ export default function ExplorePage() {
     const [query, setQuery] = useState("");
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
+    const [selectedNews, setSelectedNews] = useState<News | null>(null);
+    const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
     const [posts, setPosts] = useState<Post[]>([]);
     const [commentOpen, setCommentOpen] = useState<Record<string, boolean>>({});
     const [commentText, setCommentText] = useState<Record<string, string>>({});
