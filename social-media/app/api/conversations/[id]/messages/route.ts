@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authed, json } from "@/lib/route";
 import type { ChatMessageDto } from "@/lib/types";
+import { checkDirectMessagePermission } from "@/lib/messaging-privacy";
 
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
 const HTTP_URL_RE = /^https?:\/\/.+/i;
@@ -140,10 +141,40 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
 
     const membership = await prisma.conversationMember.findUnique({
       where: { conversationId_userId: { conversationId: id, userId: user.id } },
-      select: { conversationId: true },
+      select: {
+        conversationId: true,
+        user: { select: { username: true } },
+        conversation: {
+          select: {
+            type: true,
+            members: {
+              where: { userId: { not: user.id } },
+              select: {
+                userId: true,
+                user: { select: { username: true } },
+              },
+            },
+          },
+        },
+      },
     });
     if (!membership) {
       return json({ error: "Conversation not found" }, 404);
+    }
+
+    if (membership.conversation.type === "direct") {
+      const other = membership.conversation.members[0];
+      if (other) {
+        const permission = await checkDirectMessagePermission({
+          senderId: user.id,
+          senderUsername: membership.user.username,
+          recipientId: other.userId,
+          recipientUsername: other.user.username,
+        });
+        if (!permission.allowed) {
+          return json({ error: permission.reason }, 403);
+        }
+      }
     }
 
     const normalizedImageUrl =
