@@ -1,33 +1,11 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authed, json } from "@/lib/route";
-import type { ChatMessageDto } from "@/lib/types";
+import { messageInclude, toMessageDto } from "@/lib/chat";
 
 const editMessageSchema = z.object({
   body: z.string().trim().min(1).max(4000),
 });
-
-function toMessageDto(message: {
-  id: string;
-  senderId: string;
-  body: string;
-  imageUrl: string | null;
-  isForwarded: boolean;
-  editedAt: Date | null;
-  deletedAt: Date | null;
-  createdAt: Date;
-}): ChatMessageDto {
-  return {
-    id: message.id,
-    senderId: message.senderId,
-    body: message.body,
-    imageUrl: message.imageUrl,
-    isForwarded: message.isForwarded,
-    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
-    deletedAt: message.deletedAt ? message.deletedAt.toISOString() : null,
-    createdAt: message.createdAt.toISOString(),
-  };
-}
 
 export const PATCH = authed<{
   params: Promise<{ id: string; messageId: string }>;
@@ -58,9 +36,10 @@ export const PATCH = authed<{
   const updated = await prisma.message.update({
     where: { id: messageId },
     data: { body: parsed.data.body, editedAt: new Date() },
+    include: messageInclude,
   });
 
-  return json(toMessageDto(updated));
+  return json(toMessageDto(updated, user.id));
 });
 
 export const DELETE = authed<{
@@ -78,13 +57,18 @@ export const DELETE = authed<{
     return json({ error: "Forbidden" }, 403);
   }
   if (message.deletedAt) {
-    return json(toMessageDto(message));
+    const existing = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: messageInclude,
+    });
+    return json(toMessageDto(existing!, user.id));
   }
 
   const updated = await prisma.message.update({
     where: { id: messageId },
-    data: { deletedAt: new Date() },
+    data: { deletedAt: new Date(), pinnedAt: null },
+    include: messageInclude,
   });
 
-  return json(toMessageDto(updated));
+  return json(toMessageDto(updated, user.id));
 });

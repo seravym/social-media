@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { toUserCard, userCardSelect } from "@/lib/dto";
 import { authed, json, noContent } from "@/lib/route";
+import { messageInclude, toMessageDto } from "@/lib/chat";
 import type { ConversationDetailDto } from "@/lib/types";
 
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -9,6 +10,14 @@ const HTTP_URL_RE = /^https?:\/\/.+/i;
 const SAFE_STYLE_RE = /^[a-zA-Z0-9#(),.%_\s-]{1,120}$/;
 
 function isValidBackground(value: string): boolean {
+  if (value.includes("|")) {
+    const [theme, ...rest] = value.split("|");
+    const image = rest.join("|");
+    const themeOk = theme === "" || SAFE_STYLE_RE.test(theme);
+    const imageOk =
+      image === "" || IMAGE_DATA_URL_RE.test(image) || HTTP_URL_RE.test(image);
+    return themeOk && imageOk;
+  }
   return (
     IMAGE_DATA_URL_RE.test(value) ||
     HTTP_URL_RE.test(value) ||
@@ -49,7 +58,11 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
     where: { id },
     include: {
       members: { include: { user: { select: userCardSelect } } },
-      messages: { orderBy: { createdAt: "desc" }, take: 50 },
+      messages: {
+        include: messageInclude,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      },
     },
   });
   if (!conv) {
@@ -60,6 +73,8 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
 
   const dto: ConversationDetailDto = {
     id: conv.id,
+    type: conv.type,
+    name: conv.name,
     currentUserId: user.id,
     background: conv.background ?? null,
     other: otherMember ? toUserCard(otherMember.user) : null,
@@ -68,16 +83,10 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
       user: toUserCard(m.user),
       nickname: m.nickname ?? null,
     })),
-    messages: conv.messages.slice().reverse().map((msg) => ({
-      id: msg.id,
-      senderId: msg.senderId,
-      body: msg.body,
-      imageUrl: msg.imageUrl,
-      isForwarded: msg.isForwarded,
-      editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
-      deletedAt: msg.deletedAt ? msg.deletedAt.toISOString() : null,
-      createdAt: msg.createdAt.toISOString(),
-    })),
+    messages: conv.messages
+      .slice()
+      .reverse()
+      .map((msg) => toMessageDto(msg, user.id)),
   };
 
   return json(dto);
