@@ -456,8 +456,8 @@ export default function ExplorePage() {
                         <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
                         <button type="button"
                             onClick={() => {
-                                setQuery(t.name);
-                                setTab("Explore");
+                                setSelectedTrend(t);
+                                setSelectedNews(null);
                             }}
                             className="text-left text-base font-bold transition hover:text-[#b85c7a]">
                             <Highlight text={t.name} query={query} />
