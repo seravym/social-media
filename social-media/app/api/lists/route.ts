@@ -11,6 +11,7 @@ async function getCurrentUserId() {
   );
 }
 
+// GET: Mengambil semua List milik user
 export async function GET(request: NextRequest) {
   try {
     const userId = await getCurrentUserId();
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST: Membuat List baru
 export async function POST(request: NextRequest) {
   try {
     const userId = await getCurrentUserId();
@@ -75,40 +77,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create List and add its owner as the first member
-    const list = await prisma.$transaction(async (tx) => {
-      const newList = await tx.list.create({
-        data: {
-          name: name.trim(),
-          description: description || null,
-          isPrivate: isPrivate ?? false,
-          ownerId: userId,
-        },
-      });
-
-      await tx.listMember.create({
-        data: {
-          listId: newList.id,
-          userId,
-        },
-      });
-
-      return tx.list.findUnique({
-        where: { id: newList.id },
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatarUrl: true,
-            },
-          },
-          _count: {
-            select: { members: true },
+    const list = await prisma.list.create({
+      data: {
+        name: name.trim(),
+        description:
+          typeof description === "string" && description.trim()
+            ? description.trim()
+            : null,
+        isPrivate: isPrivate ?? false,
+        ownerId: userId,
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatarUrl: true,
           },
         },
-      });
+        _count: {
+          select: { members: true },
+        },
+      },
     });
 
     return NextResponse.json(
