@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
@@ -74,13 +75,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const list = await prisma.list.create({
-      data: {
-        name: name.trim(),
-        description: description || null,
-        isPrivate: isPrivate ?? false,
-        ownerId: userId,
-      },
+    // Create List and add its owner as the first member
+    const list = await prisma.$transaction(async (tx) => {
+      const newList = await tx.list.create({
+        data: {
+          name: name.trim(),
+          description: description || null,
+          isPrivate: isPrivate ?? false,
+          ownerId: userId,
+        },
+      });
+
+      await tx.listMember.create({
+        data: {
+          listId: newList.id,
+          userId,
+        },
+      });
+
+      return tx.list.findUnique({
+        where: { id: newList.id },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: { members: true },
+          },
+        },
+      });
     });
 
     return NextResponse.json(

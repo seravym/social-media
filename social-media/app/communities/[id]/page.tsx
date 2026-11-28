@@ -1,7 +1,8 @@
+
 "use client";
 
 import { Suspense, useEffect, useState, FormEvent } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import "./detail.css";
 
@@ -12,6 +13,20 @@ type Author = {
   avatarUrl: string | null;
 };
 
+type Comment = {
+  id: string;
+  content: string;
+  createdAt: string;
+  user: Author;
+};
+
+type Member = {
+  id: number;
+  userId: string;
+  joinedAt: string;
+  user: Author;
+};
+
 type Post = {
   id: string;
   content: string;
@@ -19,6 +34,7 @@ type Post = {
   createdAt: string;
   author: Author;
   isLiked: boolean;
+  isBookmarked: boolean;
   _count: {
     comments: number;
     likes: number;
@@ -31,6 +47,7 @@ type Community = {
   description: string | null;
   image: string | null;
   creatorId: string;
+  isCreator: boolean;
   createdAt: string;
   creator: Author;
   members: {
@@ -45,6 +62,7 @@ type Community = {
 
 function CommunityDetailContent() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const communityId = params.id;
 
   const [community, setCommunity] = useState<Community | null>(null);
@@ -52,23 +70,166 @@ function CommunityDetailContent() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [posting, setPosting] = useState(false);
+
   const [likingPosts, setLikingPosts] = useState<string[]>([]);
+  const [bookmarkingPosts, setBookmarkingPosts] = useState<string[]>([]);
+
   const [postContent, setPostContent] = useState("");
   const [error, setError] = useState("");
 
-  async function loadCommunity() {
-    const response = await fetch(`/api/commmunities/${communityId}`);
-    const result = await response.json();
+  // EDIT COMMUNITY
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editImage, setEditImage] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingCommunity, setDeletingCommunity] = useState(false);
 
-    if (!response.ok || !result.success) {
+  // MANAGE MEMBERS
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+
+  // COMMENTS
+  const [openComments, setOpenComments] = useState<string[]>([]);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentsLoaded, setCommentsLoaded] = useState<string[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState<string[]>([]);
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [sendingComments, setSendingComments] = useState<string[]>([]);
+
+  // LOAD COMMUNITY AND BOOKMARKS
+  async function loadCommunity() {
+    const [communityResponse, bookmarksResponse] = await Promise.all([
+      fetch(`/api/commmunities/${communityId}`),
+      fetch("/api/bookmarks"),
+    ]);
+
+    const communityResult = await communityResponse.json();
+    const bookmarksResult = await bookmarksResponse.json();
+
+    if (!communityResponse.ok || !communityResult.success) {
       throw new Error(
-        result.message || result.error || "Failed to fetch community."
+        communityResult.message ||
+          communityResult.error ||
+          "Failed to fetch community."
       );
     }
 
-    setCommunity(result.data);
+    if (!bookmarksResponse.ok || !bookmarksResult.success) {
+      throw new Error(
+        bookmarksResult.message || "Failed to fetch bookmarks."
+      );
+    }
+
+    const bookmarkedIds: string[] = bookmarksResult.data.map(
+      (bookmark: { id: string }) => bookmark.id
+    );
+
+    const formattedCommunity: Community = {
+      ...communityResult.data,
+      posts: communityResult.data.posts.map((post: Post) => ({
+        ...post,
+        isBookmarked: bookmarkedIds.includes(post.id),
+      })),
+    };
+
+    setCommunity(formattedCommunity);
   }
 
+  // LOAD MEMBERS
+  async function loadMembers() {
+    setLoadingMembers(true);
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${communityId}/members`
+      );
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to fetch community members."
+        );
+      }
+
+      setMembers(result.data.members || []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch members."
+      );
+    } finally {
+      setLoadingMembers(false);
+    }
+  }
+
+  // OPEN MANAGE MEMBERS
+  async function handleOpenMembers() {
+    setShowMembersModal(true);
+    await loadMembers();
+  }
+
+  // REMOVE MEMBER
+  async function handleRemoveMember(member: Member) {
+    if (!community || removingMember) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove @${member.user.username} from ${community.name}?`
+    );
+
+    if (!confirmed) return;
+
+    setRemovingMember(member.userId);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}/members`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: member.userId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to remove member."
+        );
+      }
+
+      setMembers((previous) =>
+        previous.filter((item) => item.userId !== member.userId)
+      );
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          _count: {
+            ...previous._count,
+            members: Math.max(0, previous._count.members - 1),
+          },
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to remove member."
+      );
+    } finally {
+      setRemovingMember(null);
+    }
+  }
+
+  // INITIAL DATA
   useEffect(() => {
     let ignore = false;
 
@@ -77,20 +238,22 @@ function CommunityDetailContent() {
       setError("");
 
       try {
-        const [communityResponse, membershipResponse] =
+        const [communityResponse, membershipResponse, bookmarksResponse] =
           await Promise.all([
             fetch(`/api/commmunities/${communityId}`),
             fetch(`/api/commmunities/${communityId}/membership`),
+            fetch("/api/bookmarks"),
           ]);
 
         const communityResult = await communityResponse.json();
         const membershipResult = await membershipResponse.json();
+        const bookmarksResult = await bookmarksResponse.json();
 
         if (!communityResponse.ok || !communityResult.success) {
           throw new Error(
             communityResult.message ||
               communityResult.error ||
-              `Failed to fetch community (${communityResponse.status})`
+              "Failed to fetch community."
           );
         }
 
@@ -98,12 +261,30 @@ function CommunityDetailContent() {
           throw new Error(
             membershipResult.message ||
               membershipResult.error ||
-              `Failed to check membership (${membershipResponse.status})`
+              "Failed to check membership."
           );
         }
 
+        if (!bookmarksResponse.ok || !bookmarksResult.success) {
+          throw new Error(
+            bookmarksResult.message || "Failed to fetch bookmarks."
+          );
+        }
+
+        const bookmarkedIds: string[] = bookmarksResult.data.map(
+          (bookmark: { id: string }) => bookmark.id
+        );
+
         if (!ignore) {
-          setCommunity(communityResult.data);
+          const formattedCommunity: Community = {
+            ...communityResult.data,
+            posts: communityResult.data.posts.map((post: Post) => ({
+              ...post,
+              isBookmarked: bookmarkedIds.includes(post.id),
+            })),
+          };
+
+          setCommunity(formattedCommunity);
           setIsJoined(membershipResult.isMember);
         }
       } catch (err) {
@@ -119,13 +300,109 @@ function CommunityDetailContent() {
       }
     }
 
-    loadData();
+    void loadData();
 
     return () => {
       ignore = true;
     };
   }, [communityId]);
 
+  // OPEN EDIT MODAL
+  function handleOpenEdit() {
+    if (!community) return;
+
+    setEditName(community.name);
+    setEditDescription(community.description || "");
+    setEditImage(community.image || "");
+    setShowEditModal(true);
+    setError("");
+  }
+
+  // UPDATE COMMUNITY
+  async function handleUpdateCommunity(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!community || !editName.trim()) return;
+
+    setSavingEdit(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: editName.trim(),
+            description: editDescription.trim(),
+            image: editImage.trim(),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to update community."
+        );
+      }
+
+      setShowEditModal(false);
+      await loadCommunity();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update community."
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // DELETE COMMUNITY
+  async function handleDeleteCommunity() {
+    if (!community || deletingCommunity) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${community.name}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingCommunity(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/commmunities/${community.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to delete community."
+        );
+      }
+
+      router.push("/communities");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete community."
+      );
+      setDeletingCommunity(false);
+    }
+  }
+
+  // JOIN / LEAVE COMMUNITY
   async function handleMembership() {
     if (!community) return;
 
@@ -137,12 +414,6 @@ function CommunityDetailContent() {
         `/api/commmunities/${community.id}/membership`,
         {
           method: isJoined ? "DELETE" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
-          }),
         }
       );
 
@@ -179,6 +450,7 @@ function CommunityDetailContent() {
     }
   }
 
+  // CREATE POST
   async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -196,7 +468,6 @@ function CommunityDetailContent() {
         body: JSON.stringify({
           content: postContent.trim(),
           communityId: community.id,
-          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
         }),
       });
 
@@ -219,6 +490,7 @@ function CommunityDetailContent() {
     }
   }
 
+  // LIKE / UNLIKE POST
   async function handleLike(postId: string) {
     if (likingPosts.includes(postId)) return;
 
@@ -231,9 +503,7 @@ function CommunityDetailContent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
-        }),
+        body: JSON.stringify({}),
       });
 
       const result = await response.json();
@@ -277,6 +547,186 @@ function CommunityDetailContent() {
     }
   }
 
+  // SAVE / REMOVE BOOKMARK
+  async function handleBookmark(postId: string) {
+    if (bookmarkingPosts.includes(postId)) return;
+
+    const post = community?.posts.find((item) => item.id === postId);
+    if (!post) return;
+
+    setBookmarkingPosts((previous) => [...previous, postId]);
+
+    try {
+      const response = post.isBookmarked
+        ? await fetch(
+            `/api/bookmarks?postId=${encodeURIComponent(postId)}`,
+            { method: "DELETE" }
+          )
+        : await fetch("/api/bookmarks", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ postId }),
+          });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update bookmark."
+        );
+      }
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((item) =>
+            item.id === postId
+              ? { ...item, isBookmarked: !item.isBookmarked }
+              : item
+          ),
+        };
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save post."
+      );
+    } finally {
+      setBookmarkingPosts((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
+  // OPEN / CLOSE COMMENTS
+  async function handleToggleComments(postId: string) {
+    const isOpen = openComments.includes(postId);
+
+    if (isOpen) {
+      setOpenComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+      return;
+    }
+
+    setOpenComments((previous) => [...previous, postId]);
+
+    if (
+      commentsLoaded.includes(postId) ||
+      commentsLoading.includes(postId)
+    ) {
+      return;
+    }
+
+    setCommentsLoading((previous) => [...previous, postId]);
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch comments.");
+      }
+
+      setComments((previous) => ({
+        ...previous,
+        [postId]: result.comments || [],
+      }));
+
+      setCommentsLoaded((previous) => [...previous, postId]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch comments."
+      );
+
+      setOpenComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    } finally {
+      setCommentsLoading((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
+  // SEND COMMENT
+  async function handleSendComment(
+    event: FormEvent<HTMLFormElement>,
+    postId: string
+  ) {
+    event.preventDefault();
+
+    if (sendingComments.includes(postId)) return;
+
+    const content = (commentInputs[postId] || "").trim();
+    if (!content) return;
+
+    setSendingComments((previous) => [...previous, postId]);
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.comment) {
+        throw new Error(result.error || "Failed to send comment.");
+      }
+
+      setComments((previous) => ({
+        ...previous,
+        [postId]: [
+          result.comment,
+          ...(previous[postId] || []),
+        ],
+      }));
+
+      setCommentsLoaded((previous) =>
+        previous.includes(postId) ? previous : [...previous, postId]
+      );
+
+      setCommunity((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          posts: previous.posts.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  _count: {
+                    ...post._count,
+                    comments: post._count.comments + 1,
+                  },
+                }
+              : post
+          ),
+        };
+      });
+
+      setCommentInputs((previous) => ({
+        ...previous,
+        [postId]: "",
+      }));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to send comment."
+      );
+    } finally {
+      setSendingComments((previous) =>
+        previous.filter((id) => id !== postId)
+      );
+    }
+  }
+
   function formatDate(date: string) {
     return new Date(date).toLocaleString("id-ID", {
       dateStyle: "medium",
@@ -315,6 +765,7 @@ function CommunityDetailContent() {
 
         {error && <div className="detail-error">{error}</div>}
 
+        {/* COMMUNITY HEADER */}
         <section className="detail-community-header">
           <div className="detail-community-image">
             {community.image ? (
@@ -345,6 +796,35 @@ function CommunityDetailContent() {
               </strong>
             </p>
 
+            {community.isCreator && (
+              <div className="detail-owner-actions">
+                <button
+                  type="button"
+                  className="detail-edit-community-btn"
+                  onClick={handleOpenEdit}
+                >
+                  ✏️ Edit Community
+                </button>
+
+                <button
+                  type="button"
+                  className="detail-delete-community-btn"
+                  onClick={handleDeleteCommunity}
+                  disabled={deletingCommunity}
+                >
+                  {deletingCommunity ? "Deleting..." : "🗑 Delete Community"}
+                </button>
+
+                <button
+                  type="button"
+                  className="detail-manage-members-btn"
+                  onClick={handleOpenMembers}
+                >
+                  👥 Manage Members
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               className={
@@ -362,6 +842,189 @@ function CommunityDetailContent() {
           </div>
         </section>
 
+        {/* MANAGE MEMBERS MODAL */}
+        {showMembersModal && (
+          <div
+            className="detail-members-overlay"
+            onClick={() => setShowMembersModal(false)}
+          >
+            <div
+              className="detail-members-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="detail-members-header">
+                <div>
+                  <p className="detail-subtitle">COMMUNITY SETTINGS</p>
+                  <h2>Manage Members</h2>
+                  <span>
+                    {members.length}{" "}
+                    {members.length === 1 ? "member" : "members"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="detail-edit-close"
+                  onClick={() => setShowMembersModal(false)}
+                  aria-label="Close members modal"
+                >
+                  ×
+                </button>
+              </div>
+
+              {loadingMembers ? (
+                <p className="detail-members-empty">Loading members...</p>
+              ) : members.length === 0 ? (
+                <div className="detail-members-empty">
+                  <span>👥</span>
+                  <h3>No members yet</h3>
+                  <p>When people join this community, they will appear here.</p>
+                </div>
+              ) : (
+                <div className="detail-members-list">
+                  {members.map((member) => (
+                    <div
+                      className="detail-member-item"
+                      key={member.userId}
+                    >
+                      <div className="detail-member-profile">
+                        {member.user.avatarUrl ? (
+                          <img
+                            src={member.user.avatarUrl}
+                            alt={member.user.username}
+                          />
+                        ) : (
+                          <div className="detail-member-avatar-placeholder">
+                            {(member.user.name || member.user.username)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className="detail-member-info">
+                          <strong>
+                            {member.user.name || member.user.username}
+                          </strong>
+                          <span>@{member.user.username}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="detail-remove-member-btn"
+                        onClick={() => handleRemoveMember(member)}
+                        disabled={removingMember === member.userId}
+                      >
+                        {removingMember === member.userId
+                          ? "Removing..."
+                          : "Remove"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="detail-members-footer">
+                <button
+                  type="button"
+                  onClick={() => setShowMembersModal(false)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT COMMUNITY MODAL */}
+        {showEditModal && (
+          <div
+            className="detail-edit-overlay"
+            onClick={() => setShowEditModal(false)}
+          >
+            <div
+              className="detail-edit-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="detail-edit-modal-header">
+                <div>
+                  <p className="detail-subtitle">COMMUNITY SETTINGS</p>
+                  <h2>Edit Community</h2>
+                </div>
+
+                <button
+                  type="button"
+                  className="detail-edit-close"
+                  onClick={() => setShowEditModal(false)}
+                  aria-label="Close edit modal"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateCommunity}>
+                <label htmlFor="edit-community-name">
+                  Community Name
+                </label>
+                <input
+                  id="edit-community-name"
+                  type="text"
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  minLength={3}
+                  maxLength={50}
+                  required
+                />
+
+                <label htmlFor="edit-community-description">
+                  Description
+                </label>
+                <textarea
+                  id="edit-community-description"
+                  value={editDescription}
+                  onChange={(event) =>
+                    setEditDescription(event.target.value)
+                  }
+                  rows={4}
+                  maxLength={500}
+                  placeholder="Describe your community..."
+                />
+
+                <label htmlFor="edit-community-image">
+                  Image URL
+                </label>
+                <input
+                  id="edit-community-image"
+                  type="url"
+                  value={editImage}
+                  onChange={(event) => setEditImage(event.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
+
+                <div className="detail-edit-modal-actions">
+                  <button
+                    type="button"
+                    className="detail-edit-cancel-btn"
+                    onClick={() => setShowEditModal(false)}
+                    disabled={savingEdit}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="detail-edit-save-btn"
+                    disabled={savingEdit || !editName.trim()}
+                  >
+                    {savingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* COMMUNITY POSTS */}
         <section className="detail-posts-section">
           <div className="detail-posts-heading">
             <h2>Community Posts</h2>
@@ -453,9 +1116,115 @@ function CommunityDetailContent() {
                       <span>{post._count.likes}</span>
                     </button>
 
-                    <span>💬 {post._count.comments}</span>
+                    <button
+                      type="button"
+                      className="detail-action-btn"
+                      onClick={() => handleToggleComments(post.id)}
+                    >
+                      <span>💬</span>
+                      <span>{post._count.comments}</span>
+                    </button>
+
                     <span>👁 {post.views}</span>
+
+                    <button
+                      type="button"
+                      className={`detail-action-btn detail-save-btn ${
+                        post.isBookmarked ? "saved" : ""
+                      }`}
+                      onClick={() => handleBookmark(post.id)}
+                      disabled={bookmarkingPosts.includes(post.id)}
+                    >
+                      {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
+                    </button>
                   </div>
+
+                  {openComments.includes(post.id) && (
+                    <div className="detail-comments">
+                      <h3>Comments</h3>
+
+                      {commentsLoading.includes(post.id) ? (
+                        <p className="detail-comments-empty">
+                          Loading comments...
+                        </p>
+                      ) : (comments[post.id] || []).length === 0 ? (
+                        <p className="detail-comments-empty">
+                          No comments yet. Be the first to comment!
+                        </p>
+                      ) : (
+                        <div className="detail-comments-list">
+                          {(comments[post.id] || []).map((comment) => (
+                            <div
+                              className="detail-comment"
+                              key={comment.id}
+                            >
+                              {comment.user.avatarUrl ? (
+                                <img
+                                  src={comment.user.avatarUrl}
+                                  alt={comment.user.username}
+                                  className="detail-comment-avatar"
+                                />
+                              ) : (
+                                <div className="detail-comment-avatar placeholder">
+                                  {(comment.user.name ||
+                                    comment.user.username)
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </div>
+                              )}
+
+                              <div className="detail-comment-body">
+                                <div className="detail-comment-author">
+                                  <strong>
+                                    {comment.user.name ||
+                                      comment.user.username}
+                                  </strong>
+                                  <span>@{comment.user.username}</span>
+                                </div>
+
+                                <p>{comment.content}</p>
+
+                                <small>
+                                  {formatDate(comment.createdAt)}
+                                </small>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <form
+                        className="detail-comment-form"
+                        onSubmit={(event) =>
+                          handleSendComment(event, post.id)
+                        }
+                      >
+                        <input
+                          type="text"
+                          placeholder="Write a comment..."
+                          value={commentInputs[post.id] || ""}
+                          onChange={(event) =>
+                            setCommentInputs((previous) => ({
+                              ...previous,
+                              [post.id]: event.target.value,
+                            }))
+                          }
+                        />
+
+                        <button
+                          type="submit"
+                          disabled={
+                            !(commentInputs[post.id] || "").trim() ||
+                            sendingComments.includes(post.id)
+                          }
+                        >
+                          {sendingComments.includes(post.id)
+                            ? "Sending..."
+                            : "Send"}
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

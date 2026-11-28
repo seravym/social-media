@@ -1,15 +1,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
-export async function GET(request: NextRequest) {
+// GET BOOKMARKS
+export async function GET() {
   try {
-    const userId = request.nextUrl.searchParams.get("userId");
+    const userId = await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "User ID is required" },
-        { status: 400 }
+        { success: false, message: "Please login first" },
+        { status: 401 }
       );
     }
 
@@ -94,14 +96,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ADD BOOKMARK
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { postId, userId } = body;
+    const userId = await getSessionUserId();
 
-    if (!postId || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Post ID and User ID are required" },
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const postId = body.postId;
+
+    if (!postId || typeof postId !== "string") {
+      return NextResponse.json(
+        { success: false, message: "Post ID is required" },
         { status: 400 }
       );
     }
@@ -150,14 +162,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// REMOVE BOOKMARK
 export async function DELETE(request: NextRequest) {
   try {
-    const postId = request.nextUrl.searchParams.get("postId");
-    const userId = request.nextUrl.searchParams.get("userId");
+    const userId = await getSessionUserId();
 
-    if (!postId || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Post ID and User ID are required" },
+        { success: false, message: "Please login first" },
+        { status: 401 }
+      );
+    }
+
+    const postId = request.nextUrl.searchParams.get("postId");
+
+    if (!postId) {
+      return NextResponse.json(
+        { success: false, message: "Post ID is required" },
         { status: 400 }
       );
     }

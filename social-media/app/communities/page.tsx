@@ -29,12 +29,21 @@ export default function CommunitiesPage() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
 
+  // CREATE COMMUNITY
   const [showModal, setShowModal] = useState(false);
   const [communityName, setCommunityName] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
   const [formError, setFormError] = useState("");
 
+  // CREATE POST
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postContent, setPostContent] = useState("");
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
+
+  // FETCH COMMUNITIES
   async function fetchCommunities(): Promise<Community[]> {
     const response = await fetch("/api/commmunities");
     const result = await response.json();
@@ -70,6 +79,7 @@ export default function CommunitiesPage() {
     );
   }
 
+  // INITIAL LOAD
   useEffect(() => {
     let ignore = false;
 
@@ -81,6 +91,9 @@ export default function CommunitiesPage() {
       })
       .catch((error) => {
         console.error("Failed to fetch communities:", error);
+        if (!ignore) {
+          setActionError("Failed to load communities.");
+        }
       })
       .finally(() => {
         if (!ignore) {
@@ -93,10 +106,12 @@ export default function CommunitiesPage() {
     };
   }, []);
 
+  // SEARCH
   const filteredCommunities = communities.filter((community) =>
     community.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  // JOIN / LEAVE COMMUNITY
   async function handleMembership(community: Community) {
     setProcessingId(community.id);
     setActionError("");
@@ -106,12 +121,6 @@ export default function CommunitiesPage() {
         `/api/commmunities/${community.id}/membership`,
         {
           method: community.isJoined ? "DELETE" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: process.env.NEXT_PUBLIC_TEST_USER_ID,
-          }),
         }
       );
 
@@ -150,6 +159,7 @@ export default function CommunitiesPage() {
     }
   }
 
+  // CREATE COMMUNITY
   async function handleCreateCommunity(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -176,7 +186,6 @@ export default function CommunitiesPage() {
           name: communityName.trim(),
           description: description.trim(),
           image: image.trim(),
-          creatorId: process.env.NEXT_PUBLIC_TEST_USER_ID,
         }),
       });
 
@@ -210,9 +219,85 @@ export default function CommunitiesPage() {
     setFormError("");
   }
 
+  // OPEN CREATE POST MODAL
+  function handleOpenPostModal() {
+    const joinedCommunities = communities.filter(
+      (community) => community.isJoined
+    );
+
+    setPostContent("");
+    setPostError("");
+
+    setSelectedCommunityId(
+      joinedCommunities.length > 0
+        ? String(joinedCommunities[0].id)
+        : ""
+    );
+
+    setShowPostModal(true);
+  }
+
+  // CREATE POST
+  async function handleCreatePost(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (!postContent.trim()) {
+      setPostError("Post content cannot be empty.");
+      return;
+    }
+
+    if (!selectedCommunityId) {
+      setPostError("Please join a community first.");
+      return;
+    }
+
+    setPosting(true);
+    setPostError("");
+
+    try {
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: postContent.trim(),
+          communityId: Number(selectedCommunityId),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Failed to create post."
+        );
+      }
+
+      setShowPostModal(false);
+      setPostContent("");
+      setSelectedCommunityId("");
+      setPostError("");
+
+      // REDIRECT TO COMMUNITIES HOME
+      router.push("/communities/home");
+    } catch (error) {
+      console.error("Create Post Error:", error);
+
+      setPostError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
+    } finally {
+      setPosting(false);
+    }
+  }
+
   return (
     <div className="communities-page">
       <div className="communities-container">
+        {/* HEADER */}
         <div className="communities-header">
           <div>
             <p className="communities-subtitle">
@@ -226,14 +311,26 @@ export default function CommunitiesPage() {
             </p>
           </div>
 
-          <button
-            className="create-community-btn"
-            onClick={() => setShowModal(true)}
-          >
-            + Create Community
-          </button>
+          <div className="communities-header-actions">
+            <button
+              type="button"
+              className="create-post-btn"
+              onClick={handleOpenPostModal}
+            >
+              + Post
+            </button>
+
+            <button
+              type="button"
+              className="create-community-btn"
+              onClick={() => setShowModal(true)}
+            >
+              + Create Community
+            </button>
+          </div>
         </div>
 
+        {/* TABS */}
         <div className="community-page-tabs">
           <Link
             href="/communities/home"
@@ -250,6 +347,7 @@ export default function CommunitiesPage() {
           </Link>
         </div>
 
+        {/* EXPLORE HEADING */}
         <div className="community-explore-heading">
           <div>
             <h2>Explore Communities</h2>
@@ -257,6 +355,7 @@ export default function CommunitiesPage() {
           </div>
         </div>
 
+        {/* SEARCH */}
         <div className="community-search">
           <input
             type="text"
@@ -270,6 +369,7 @@ export default function CommunitiesPage() {
           <p className="form-error">{actionError}</p>
         )}
 
+        {/* COMMUNITY LIST */}
         {loading ? (
           <p className="community-loading">
             Loading communities...
@@ -347,6 +447,7 @@ export default function CommunitiesPage() {
         )}
       </div>
 
+      {/* CREATE COMMUNITY MODAL */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div
@@ -423,6 +524,125 @@ export default function CommunitiesPage() {
                   disabled={submitting}
                 >
                   {submitting ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE POST MODAL */}
+      {showPostModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!posting) setShowPostModal(false);
+          }}
+        >
+          <div
+            className="create-post-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="post-modal-header">
+              <div>
+                <p className="communities-subtitle">
+                  SHARE YOUR THOUGHTS
+                </p>
+                <h2>Create Post</h2>
+              </div>
+
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowPostModal(false)}
+                disabled={posting}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePost}>
+              <div className="form-group">
+                <label htmlFor="post-community">
+                  Choose Community *
+                </label>
+
+                <select
+                  id="post-community"
+                  value={selectedCommunityId}
+                  onChange={(e) =>
+                    setSelectedCommunityId(e.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select a community</option>
+
+                  {communities
+                    .filter((community) => community.isJoined)
+                    .map((community) => (
+                      <option
+                        key={community.id}
+                        value={community.id}
+                      >
+                        {community.name}
+                      </option>
+                    ))}
+                </select>
+
+                {communities.filter(
+                  (community) => community.isJoined
+                ).length === 0 && (
+                  <small className="post-modal-hint">
+                    You havent joined any communities yet. Join a
+                    community before creating a post.
+                  </small>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="post-content">
+                  Your Post *
+                </label>
+
+                <textarea
+                  id="post-content"
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder="What's happening?"
+                  rows={6}
+                  maxLength={1000}
+                  required
+                />
+
+                <span className="post-character-count">
+                  {postContent.length}/1000
+                </span>
+              </div>
+
+              {postError && (
+                <p className="form-error">{postError}</p>
+              )}
+
+              <div className="post-modal-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => setShowPostModal(false)}
+                  disabled={posting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={
+                    posting ||
+                    !postContent.trim() ||
+                    !selectedCommunityId
+                  }
+                >
+                  {posting ? "Posting..." : "Post"}
                 </button>
               </div>
             </form>
