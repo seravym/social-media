@@ -58,9 +58,33 @@ export default function ProfilePage() {
               <strong>Nama Akun</strong> @username
             </p>
             <p>kenapa aku begadang terus??</p>
+            <div className = "post-actions">
+                <span>💬 890</span>
+                <span>♡ 15</span>
+                <span>📊 1M</span>
+                <span>🔖</span>
+            </div>
           </div>
         </section>
+
+        <section className="profile-posts">
+          <div className="post-item">
+            <p>
+              <strong>Nama Akun</strong> @username
+            </p>
+            <p> Bismillah Front-End A</p>
+            <div className = "post-actions">
+                <span>💬 8</span>
+                <span>♡ 15</span>
+                <span>📊 1M</span>
+                <span>🔖</span>
+            </div>
+          </div>
+        </section>
+
       </main>
+
+      
 
       <aside className="profile-sidebar">
         <input type="text" placeholder="Search..." />
