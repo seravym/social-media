@@ -124,6 +124,24 @@ export default function ProfilePage() {
           <p>#randomtrend</p>
         </div>
       </aside>
+
+{isEditOpen && (
+    <div className = "edit-backdrop">
+        <div className = "edit-card">
+            <div className = "edit-header">
+                <span> MAKE UR PROFILE </span>
+                <button
+                type = "button"
+                className = "edit-close-btn"
+                onClick={() => setIsEditOpen(false)}
+                > X </button>
+            </div>
+        </div>
+    </div>
+)}
+
+
+
     </div>
   );
 }
