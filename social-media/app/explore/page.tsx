@@ -78,8 +78,6 @@ export default function ExplorePage() {
     const [query, setQuery] = useState("");
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
-    const [selectedNews, setSelectedNews] = useState<News | null>(null);
-    const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
     const [posts, setPosts] = useState<Post[]>([]);
     const [commentOpen, setCommentOpen] = useState<Record<string, boolean>>({});
     const [commentText, setCommentText] = useState<Record<string, string>>({});
@@ -405,50 +403,6 @@ export default function ExplorePage() {
             ))}
         </div>
 
-        {(selectedNews || selectedTrend) && (
-            <div className="mb-6 rounded-2xl border border-gray-200 bg-white/80 p-5">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setSelectedNews(null);
-                        setSelectedTrend(null);
-                    }}
-                    className="mb-4 text-sm font-semibold text-[#b85c7a] hover:underline"
-                >
-                    ← Kembali ke Explore
-                </button>
-
-                {selectedNews && (
-                    <>
-                        <p className="mb-2 text-sm text-gray-500">
-                            {selectedNews.category} · {timeAgo(selectedNews.createdAt)}
-                        </p>
-                        <h2 className="text-xl font-bold text-slate-900">
-                            {selectedNews.title}
-                        </h2>
-                        <p className="mt-3 text-base text-gray-600">
-                            {selectedNews.summary}
-                        </p>
-                        <p className="mt-4 text-sm text-gray-500">
-                            {formatCount(selectedNews.postCount)}
-                        </p>
-                    </>
-                )}
-                {selectedTrend && (
-                    <>
-                        <p className="mb-2 text-sm text-gray-500">
-                            {selectedTrend.category} · Trending di Indonesia
-                        </p>
-                        <h2 className="text-xl font-bold text-slate-900">
-                            {selectedTrend.name}
-                        </h2>
-                        <p className="mt-3 text-sm text-gray-500">
-                            {formatCount(selectedTrend.postCount)}
-                        </p>
-                    </>
-                )}
-            </div>
-        )}
         {loading && <p className="py-8 text-center text-gray-500">Memuat...</p>}
         {!loading && (
             <>
@@ -458,16 +412,12 @@ export default function ExplorePage() {
                 <ul className="space-y-4">
                     {shownNews.map((n) => (
                     <li key={n.id} className="border-b border-gray-100 pb-3">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSelectedNews(n);
-                                setSelectedTrend(null);
-                            }}
+                        <Link
+                            href={`/explore/detail?type=news&id=${encodeURIComponent(n.id)}`}
                             className="text-left text-base font-bold transition hover:text-[#b85c7a]"
                         >
                             <Highlight text={n.title} query={query} />
-                        </button>
+                        </Link>
                         <p className="mt-1 text-sm text-gray-500">
                         {timeAgo(n.createdAt)} · {n.category} · {formatCount(n.postCount)}
                         </p>
@@ -484,14 +434,12 @@ export default function ExplorePage() {
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
                         <div>
                         <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
-                        <button type="button"
-                            onClick={() => {
-                                setSelectedTrend(t);
-                                setSelectedNews(null);
-                            }}
-                            className="text-left text-base font-bold transition hover:text-[#b85c7a]">
+                        <Link
+                            href={`/explore/detail?type=trending&id=${encodeURIComponent(t.id)}`}
+                            className="text-left text-base font-bold transition hover:text-[#b85c7a]"
+                        >
                             <Highlight text={t.name} query={query} />
-                        </button>
+                        </Link>
                         <p className="text-sm text-gray-500">{formatCount(t.postCount)}</p>
                         </div>
                     </li>
