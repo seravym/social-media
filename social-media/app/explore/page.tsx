@@ -69,6 +69,8 @@ export default function ExplorePage() {
     const [trending, setTrending] = useState<Trend[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [following, setFollowing] = useState<Record<string, boolean>>({});
+    const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [focused, setFocused] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -76,6 +78,42 @@ export default function ExplorePage() {
     async function loadHistory() {
         const res = await fetch("/api/explore/history");
         if (res.ok) setHistory(await res.json());
+    }
+    
+    async function toggleFollow(accountId: string) {
+        if (followLoading[accountId]) return;
+
+        setFollowLoading((prev) => ({
+            ...prev,
+            [accountId]: true,
+        }));
+        try {
+            const res = await fetch("/api/follow", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    followingId: accountId,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || "Gagal memproses follow");
+                return;
+            }
+            setFollowing((prev) => ({
+                ...prev,
+                [accountId]: data.following,
+            }));
+        } catch {
+            alert("Terjadi kesalahan saat memproses follow");
+        } finally {
+            setFollowLoading((prev) => ({
+                ...prev,
+                [accountId]: false,
+            }));
+        }
     }
 
     useEffect(() => {
@@ -89,7 +127,32 @@ export default function ExplorePage() {
         };
     }, []);
 
-    // pencarian langsung (jeda 300 ms)
+    useEffect(() => {
+        let cancelled = false;
+        async function loadFollowing() {
+            try {
+                const res = await fetch("/api/follow");
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) {
+                    const status: Record<string, boolean> = {};
+                    (data.users ?? []).forEach(
+                        (user: { id: string; isFollowing: boolean }) => {
+                            status[user.id] = user.isFollowing;
+                        }
+                    );
+                    setFollowing(status);
+                }
+            } catch (error) {
+                console.error("Gagal memuat status follow:", error);
+            }
+        }
+        loadFollowing();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         const timer = setTimeout(async () => {
         setLoading(true);
@@ -99,7 +162,7 @@ export default function ExplorePage() {
             const data = await res.json();
             setNews(data.news);
             setTrending(data.trending);
-            setPosts(data.posts);
+            setPosts(data.posts ?? []);
             setAccounts(data.accounts);
             }
         } finally {
@@ -129,17 +192,16 @@ export default function ExplorePage() {
         setHistory([]);
     }
 
-    // filter per tab
     const byCategory = <T extends { category: string }>(list: T[]) =>
         tab === "Explore" || tab === "Trending" ? list : list.filter((i) => i.category === tab);
 
     const searching = query.trim().length > 0;
-    const compact = tab === "Explore" && !searching; // ringkas di tab Explore tanpa pencarian
+    const compact = tab === "Explore" && !searching;
 
     const shownNews = tab === "Trending" ? [] : byCategory(news);
     const allTrending = byCategory(trending);
     const shownTrending = compact ? allTrending.slice(0, 5) : allTrending;
-    const allPosts = tab === "Trending" ? [] : byCategory(posts);
+    const allPosts = tab === "Trending" ? [] : (byCategory(posts ?? []) ?? []);
     const shownPosts = compact ? allPosts.slice(0, 5) : allPosts;
     const showAccounts = (tab === "Explore" || searching) && accounts.length > 0;
 
@@ -159,7 +221,6 @@ export default function ExplorePage() {
 
     return (
         <main className="mx-auto w-full max-w-4xl px-6 py-8">
-        {/* pencarian */}
         <div className="relative mb-4 flex items-center gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
@@ -176,7 +237,6 @@ export default function ExplorePage() {
             />
 
             {focused && !searching && history.length > 0 && (
-                // onMouseDown mencegah input kehilangan fokus sebelum klik terproses
                 <div
                 onMouseDown={(e) => e.preventDefault()}
                 className="absolute left-0 right-0 top-full z-10 mt-2 rounded-xl border border-gray-200 bg-white shadow-lg"
@@ -212,7 +272,6 @@ export default function ExplorePage() {
             </div>
         </div>
 
-        {/* tab */}
         <div className="mb-6 flex border-b border-gray-200">
             {TABS.map((t) => (
             <button
@@ -259,9 +318,14 @@ export default function ExplorePage() {
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
                         <div>
                         <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
-                        <p className="text-base font-bold">
+                        <button type="button"
+                            onClick={() => {
+                                setQuery(t.name);
+                                setTab("Explore");
+                            }}
+                            className="text-left text-base font-bold hover:text-pink-600">
                             <Highlight text={t.name} query={query} />
-                        </p>
+                        </button>
                         <p className="text-sm text-gray-500">{formatCount(t.postCount)}</p>
                         </div>
                     </li>
@@ -276,14 +340,30 @@ export default function ExplorePage() {
                     {accounts.map((a) => (
                     <li key={a.id} className="flex items-center gap-3 border-b border-gray-100 pb-3">
                         <Avatar name={a.name ?? a.username} />
-                        <div>
-                        <p className="text-base font-bold">
-                            <Highlight text={a.name ?? a.username} query={query} />
-                        </p>
-                        <p className="text-sm text-gray-500">
-                            @<Highlight text={a.username} query={query} />
-                        </p>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-base font-bold">
+                                <Highlight text={a.name ?? a.username} query={query} />
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                @<Highlight text={a.username} query={query} />
+                            </p>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => toggleFollow(a.id)}
+                            disabled={!!followLoading[a.id]}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                following[a.id]
+                                    ? "border border-gray-300 bg-white text-gray-700"
+                                    : "bg-pink-600 text-white hover:bg-pink-700"
+                            } disabled:opacity-50`}
+                        >
+                            {followLoading[a.id]
+                                ? "Memproses..."
+                                : following[a.id]
+                                    ? "Following"
+                                    : "Follow"}
+                        </button>
                     </li>
                     ))}
                 </ul>
