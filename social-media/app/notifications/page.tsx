@@ -1,220 +1,545 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  Bell,
+  Check,
+  Compass,
+  Home,
+  MessageSquare,
+  Settings,
+  TrendingUp,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import type { NotificationDto } from "@/lib/types";
+import {
+  groupNotifications,
+  NOTIFICATION_ACTION_TEXT,
+  type GroupedNotification,
+} from "@/lib/notifications";
+import { NotificationItem } from "@/components/notifications/NotificationItem";
 
-type Tab = "all" | "unread";
+type FilterTab = "all" | "unread" | "like" | "follow" | "reply";
 
-const TYPE_STYLES: Record<
-  NotificationDto["type"],
-  { icon: string; label: string; color: string }
-> = {
-  like: { icon: "❤️", label: "liked your post", color: "#e0245e" },
-  follow: { icon: "➕", label: "followed you", color: "#1d9bf0" },
-  reply: { icon: "💬", label: "replied to your post", color: "#00ba7c" },
-  mention: { icon: "📣", label: "mentioned you", color: "#7c3aed" },
-  system: { icon: "🔔", label: "", color: "#f59e0b" },
-};
-
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString();
+interface ToastItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  undoIds?: string[];
 }
 
-function Avatar({ name, url }: { name: string; url: string | null }) {
-  if (url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={url}
-        alt={name}
-        className="h-10 w-10 shrink-0 rounded-full object-cover"
-      />
-    );
-  }
-  return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">
-      {name.charAt(0).toUpperCase()}
-    </span>
-  );
+interface TrendingItem {
+  id: string;
+  name: string;
+  category?: string | null;
+  postCount: number;
 }
+
+interface AccountItem {
+  id: string;
+  name: string | null;
+  username: string;
+}
+
+const HIDDEN_KEY = "social_media_hidden_notifs_v1";
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "Semua" },
+  { key: "unread", label: "Belum Dibaca" },
+  { key: "like", label: "Suka" },
+  { key: "follow", label: "Pengikut" },
+  { key: "reply", label: "Balasan" },
+];
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = useState<FilterTab>("all");
   const [items, setItems] = useState<NotificationDto[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [trending, setTrending] = useState<TrendingItem[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [exploreLoading, setExploreLoading] = useState(true);
+  const [hiddenIds, setHiddenIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem(HIDDEN_KEY);
+      return saved ? (JSON.parse(saved) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastItem | null>(null);
+
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const showToast = useCallback((next: ToastItem) => {
+    setToast(next);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 4500);
+  }, []);
+
+  const fetchNotifications = useCallback(
+    async (isPoll = false) => {
+      try {
+        const res = await fetch("/api/notifications?tab=all", {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          if (!isPoll) throw new Error("Gagal memuat notifikasi.");
+          return;
+        }
+        const data = await res.json();
+        const incoming: NotificationDto[] = data.items ?? [];
+
+        if (initializedRef.current && isPoll) {
+          const brandNew = incoming.filter(
+            (n) => !seenIdsRef.current.has(n.id) && !n.isRead,
+          );
+          if (brandNew.length > 0) {
+            const latest = brandNew[0];
+            const action =
+              NOTIFICATION_ACTION_TEXT[latest.type] ??
+              NOTIFICATION_ACTION_TEXT.system;
+            showToast({
+              id: latest.id,
+              title: latest.actor
+                ? `${latest.actor.displayName} ${action}`
+                : action,
+              subtitle:
+                brandNew.length > 1
+                  ? `+${brandNew.length - 1} notifikasi baru lainnya`
+                  : (latest.message ?? undefined),
+            });
+            window.dispatchEvent(new Event("notifications-changed"));
+          }
+        }
+
+        for (const n of incoming) seenIdsRef.current.add(n.id);
+        initializedRef.current = true;
+        setItems(incoming);
+        setError(null);
+      } catch (e) {
+        if (!isPoll) {
+          setError(
+            e instanceof Error ? e.message : "Terjadi kesalahan saat memuat.",
+          );
+        }
+      } finally {
+        if (!isPoll) setLoading(false);
+      }
+    },
+    [showToast],
+  );
+
+  useEffect(() => {
+    void fetchNotifications(false);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void fetchNotifications(true);
+    }, 8000);
+    const onVisibility = () => {
+      if (!document.hidden) void fetchNotifications(true);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    };
+  }, [fetchNotifications]);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    fetch(`/api/notifications?tab=${tab}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load notifications");
-        return res.json();
-      })
+    fetch("/api/explore", { cache: "no-store", signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        setItems(data.items ?? []);
-        setUnreadCount(data.unreadCount ?? 0);
-        setError(null);
+        if (data?.trending) {
+          setTrending((data.trending as TrendingItem[]).slice(0, 5));
+        }
+        if (data?.accounts) {
+          setAccounts((data.accounts as AccountItem[]).slice(0, 3));
+        }
       })
-      .catch((e) => {
-        if (controller.signal.aborted) return;
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      })
+      .catch(() => undefined)
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setExploreLoading(false);
       });
-
     return () => controller.abort();
-  }, [tab]);
+  }, []);
 
-  const handleTabChange = (next: Tab) => {
-    if (next === tab) return;
-    setLoading(true);
-    setTab(next);
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+  const visibleItems = useMemo(
+    () => items.filter((n) => !hiddenSet.has(n.id)),
+    [items, hiddenSet],
+  );
+  const unreadCount = useMemo(
+    () => visibleItems.filter((n) => !n.isRead).length,
+    [visibleItems],
+  );
+
+  const grouped = useMemo(() => {
+    const filtered = visibleItems.filter((n) => {
+      if (tab === "unread") return !n.isRead;
+      if (tab === "like") return n.type === "like";
+      if (tab === "follow") return n.type === "follow";
+      if (tab === "reply") return n.type === "reply" || n.type === "mention";
+      return true;
+    });
+    return groupNotifications(filtered);
+  }, [visibleItems, tab]);
+
+  const persistHidden = (next: string[]) => {
+    setHiddenIds(next);
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+    } catch {
+      return;
+    }
   };
 
-  const handleMarkRead = async (id: string) => {
-    setItems((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
-    setUnreadCount((c) => Math.max(0, c - 1));
-    await fetch(`/api/notifications/${id}/read`, { method: "POST" });
-    window.dispatchEvent(new Event("notifications-changed"));
+  const handleOpenGroup = async (group: GroupedNotification) => {
+    const idSet = new Set(group.ids);
+    const unreadIds = items
+      .filter((n) => idSet.has(n.id) && !n.isRead)
+      .map((n) => n.id);
+
+    if (unreadIds.length > 0) {
+      setItems((prev) =>
+        prev.map((n) => (idSet.has(n.id) ? { ...n, isRead: true } : n)),
+      );
+      await Promise.all(
+        unreadIds.map((id) =>
+          fetch(`/api/notifications/${id}/read`, { method: "POST" }).catch(
+            () => undefined,
+          ),
+        ),
+      );
+      window.dispatchEvent(new Event("notifications-changed"));
+    }
+
+    if (group.postId) router.push(`/post/${group.postId}`);
   };
 
   const handleMarkAllRead = async () => {
     setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setUnreadCount(0);
-    await fetch("/api/notifications/read-all", { method: "POST" });
+    await fetch("/api/notifications/read-all", { method: "POST" }).catch(
+      () => undefined,
+    );
     window.dispatchEvent(new Event("notifications-changed"));
   };
 
-  const handleClick = (n: NotificationDto) => {
-    if (!n.isRead) handleMarkRead(n.id);
+  const handleHideGroup = (group: GroupedNotification) => {
+    persistHidden(Array.from(new Set([...hiddenIds, ...group.ids])));
+    showToast({
+      id: `hide_${group.key}`,
+      title: "Notifikasi disembunyikan",
+      undoIds: group.ids,
+    });
+  };
+
+  const handleUndoHide = (undoIds: string[]) => {
+    const removeSet = new Set(undoIds);
+    persistHidden(hiddenIds.filter((id) => !removeSet.has(id)));
+    setToast(null);
   };
 
   return (
-    <div className="mx-auto min-h-dvh w-full px-0 py-0 sm:max-w-2xl sm:px-4 sm:py-8">
-      <nav className="mb-4 hidden gap-4 px-4 text-sm sm:flex sm:px-0">
-        <a href="/home" className="text-accent hover:underline">Home</a>
-        <a href="/communities" className="text-accent hover:underline">Communities</a>
-      </nav>
-
-      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:border-b-0 sm:px-0 sm:py-0">
-        <h1 className="text-xl font-bold sm:text-2xl">Notifications</h1>
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllRead}
-            className="shrink-0 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover sm:px-4 sm:text-sm"
+    <div className="bg-dot-canvas min-h-dvh text-slate-900">
+      <header className="sticky top-0 z-20 border-b border-white/75 bg-white/75 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
+          <Link
+            href="/home"
+            className="text-sm font-bold tracking-tight text-slate-900"
           >
-            Mark all read
-          </button>
-        )}
+            Social
+          </Link>
+
+          <nav className="flex items-center gap-1 overflow-x-auto text-xs font-medium">
+            <Link
+              href="/home"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+            >
+              <Home className="h-3.5 w-3.5" />
+              Beranda
+            </Link>
+            <Link
+              href="/explore"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+            >
+              <Compass className="h-3.5 w-3.5" />
+              Jelajahi
+            </Link>
+            <Link
+              href="/conversations"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Pesan
+            </Link>
+            <Link
+              href="/notifications"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#faf0f3] px-3 py-1.5 font-semibold text-[#9e4865]"
+            >
+              <Bell className="h-3.5 w-3.5 text-[#b85c7a]" />
+              Notifikasi
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-[#b85c7a] px-1.5 text-[10px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/communities"
+              className="hidden shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900 sm:flex"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Komunitas
+            </Link>
+          </nav>
+
+          <Link
+            href="/settings"
+            aria-label="Pengaturan"
+            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100/80 hover:text-slate-900"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        </div>
       </header>
 
-      {/* Tabs */}
-      <div className="sticky top-0 z-10 mt-0 flex border-b border-line bg-background/95 backdrop-blur sm:mt-4">
-        {(
-          [
-            { key: "all", label: "All" },
-            { key: "unread", label: "Unread" },
-          ] as const
-        ).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => handleTabChange(key)}
-            className={`flex-1 py-3 text-center text-sm font-medium transition-colors hover:bg-accent-soft sm:text-base ${
-              tab === key
-                ? "border-b-2 border-accent text-accent"
-                : "text-muted"
-            }`}
-          >
-            {label}
-            {key === "unread" && unreadCount > 0 && (
-              <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs text-white">
-                {unreadCount}
-              </span>
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <main className="glass-panel overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2">
+            <h1 className="text-base font-bold text-slate-900">Notifikasi</h1>
+            <div className="flex items-center gap-3 text-xs">
+              {hiddenIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => persistHidden([])}
+                  className="font-medium text-slate-500 transition hover:text-[#b85c7a]"
+                >
+                  Tampilkan ({hiddenIds.length})
+                </button>
+              )}
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  className="inline-flex items-center gap-1 font-semibold text-[#b85c7a] transition hover:text-[#9e4865]"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Tandai dibaca
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-5 overflow-x-auto border-b border-white/75 px-5">
+            {FILTER_TABS.map(({ key, label }) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTab(key)}
+                  className={`shrink-0 border-b-2 py-2.5 text-xs font-medium transition ${
+                    active
+                      ? "border-[#b85c7a] font-semibold text-[#9e4865]"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {loading ? (
+            <div className="divide-y divide-white/60">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex animate-pulse items-center gap-3.5 px-5 py-4"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-slate-200/80" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-2/3 rounded bg-slate-200/80" />
+                    <div className="h-3 w-1/3 rounded bg-slate-200/60" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <p className="text-sm text-slate-600">{error}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  void fetchNotifications(false);
+                }}
+                className="rounded-lg bg-[#b85c7a] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
+              >
+                Coba lagi
+              </button>
+            </div>
+          ) : grouped.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <Bell className="mb-2.5 h-6 w-6 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-700">
+                Belum ada notifikasi
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Suka, pengikut baru, dan balasan akan muncul di sini.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-white/65">
+              {grouped.map((group) => (
+                <NotificationItem
+                  key={group.key}
+                  group={group}
+                  onOpen={(g) => void handleOpenGroup(g)}
+                  onProfileClick={(id) => router.push(`/profile/${id}`)}
+                  onHide={handleHideGroup}
+                />
+              ))}
+            </ul>
+          )}
+        </main>
+
+        <aside className="hidden lg:block">
+          <div className="sticky top-16 space-y-4">
+            <div className="glass-panel overflow-hidden rounded-2xl">
+              <div className="flex items-center justify-between border-b border-white/75 px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-[#b85c7a]" />
+                  <h2 className="text-xs font-semibold text-slate-900">
+                    Trending
+                  </h2>
+                </div>
+                <Link
+                  href="/explore"
+                  className="text-[11px] font-medium text-[#b85c7a] transition hover:text-[#9e4865]"
+                >
+                  Lihat semua
+                </Link>
+              </div>
+
+              {exploreLoading ? (
+                <div className="divide-y divide-white/60">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="animate-pulse space-y-1.5 px-4 py-3">
+                      <div className="h-3 w-2/3 rounded bg-slate-200/80" />
+                      <div className="h-2.5 w-1/3 rounded bg-slate-200/60" />
+                    </div>
+                  ))}
+                </div>
+              ) : trending.length === 0 ? (
+                <p className="px-4 py-5 text-center text-xs text-slate-400">
+                  Belum ada topik trending.
+                </p>
+              ) : (
+                <ul className="divide-y divide-white/65">
+                  {trending.map((topic) => (
+                    <li key={topic.id}>
+                      <Link
+                        href={`/explore?q=${encodeURIComponent(topic.name)}`}
+                        className="block px-4 py-3 transition hover:bg-white/60"
+                      >
+                        <p className="truncate text-xs font-semibold text-slate-800">
+                          {topic.name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {topic.category ? `${topic.category} · ` : ""}
+                          {topic.postCount} postingan
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {accounts.length > 0 && (
+              <div className="glass-panel overflow-hidden rounded-2xl">
+                <div className="flex items-center gap-1.5 border-b border-white/75 px-4 py-3">
+                  <UserPlus className="h-3.5 w-3.5 text-[#b85c7a]" />
+                  <h2 className="text-xs font-semibold text-slate-900">
+                    Mungkin kamu kenal
+                  </h2>
+                </div>
+                <ul className="divide-y divide-white/65">
+                  {accounts.map((acc) => {
+                    const display = acc.name?.trim() || acc.username;
+                    return (
+                      <li key={acc.id}>
+                        <Link
+                          href={`/profile/${acc.id}`}
+                          className="flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-white/60"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#faf0f3] text-xs font-semibold text-[#b85c7a]">
+                            {display.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-slate-800">
+                              {display}
+                            </p>
+                            <p className="truncate text-[11px] text-slate-400">
+                              @{acc.username}
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
-          </button>
-        ))}
+          </div>
+        </aside>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <p className="py-10 text-center text-muted">Loading…</p>
-      ) : error ? (
-        <p className="py-10 px-4 text-center text-red-500">{error}</p>
-      ) : items.length === 0 ? (
-        <div className="py-16 px-4 text-center text-muted">
-          <p className="text-4xl">🔔</p>
-          <p className="mt-2 font-semibold">No notifications yet</p>
-          <p className="text-sm">Likes, follows, and replies will show up here.</p>
-        </div>
-      ) : (
-        <ul>
-          {items.map((n) => {
-            const style = TYPE_STYLES[n.type] ?? TYPE_STYLES.system;
-            return (
-              <li
-                key={n.id}
-                onClick={() => handleClick(n)}
-                className={`flex items-start gap-3 border-b border-line px-4 py-3 transition-colors sm:py-4 ${
-                  n.isRead ? "bg-surface" : "bg-accent-soft"
-                } hover:bg-accent-soft/50`}
+      {toast && (
+        <div className="fixed right-4 bottom-4 z-50 w-full max-w-xs">
+          <div className="glass-panel flex items-center justify-between gap-3 rounded-xl border border-white/85 px-3.5 py-2.5 shadow-lg">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-900">
+                {toast.title}
+              </p>
+              {toast.subtitle && (
+                <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                  {toast.subtitle}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {toast.undoIds && (
+                <button
+                  type="button"
+                  onClick={() => handleUndoHide(toast.undoIds!)}
+                  className="text-xs font-semibold text-[#b85c7a] hover:text-[#9e4865]"
+                >
+                  Urungkan
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                aria-label="Tutup"
+                className="rounded p-1 text-slate-400 hover:bg-white/80 hover:text-slate-700"
               >
-                {/* Avatar */}
-                <Avatar
-                  name={n.actor?.displayName ?? "S"}
-                  url={n.actor?.avatarUrl ?? null}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-foreground sm:text-base">
-                    {n.actor ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/profile/${n.actor!.id}`);
-                        }}
-                        className="font-semibold hover:underline"
-                      >
-                        {n.actor.displayName}
-                      </button>
-                    ) : (
-                      <span className="font-semibold">Someone</span>
-                    )}{" "}
-                    <span className="text-muted">{style.label}</span>
-                  </p>
-                  {n.message && (
-                    <p className="mt-0.5 truncate text-sm text-muted">{n.message}</p>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-xs text-muted">{timeAgo(n.createdAt)}</span>
-                  {!n.isRead && (
-                    <span className="h-2 w-2 rounded-full bg-accent" />
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

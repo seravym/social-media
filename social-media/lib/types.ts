@@ -9,6 +9,7 @@ export interface NotificationDto {
   id: string;
   type: "like" | "follow" | "reply" | "mention" | "system";
   actor: UserCard | null;
+  postId?: string | null;
   message: string | null;
   isRead: boolean;
   createdAt: string;

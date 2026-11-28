@@ -42,10 +42,19 @@
   line-height: 1.6;
 }
 
+/* HEADER ACTIONS */
+
+.communities-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.create-post-btn,
 .create-community-btn {
   border: none;
   border-radius: 30px;
-  background: #e84b9b;
   color: white;
   padding: 13px 22px;
   font-size: 14px;
@@ -53,6 +62,19 @@
   cursor: pointer;
   transition: 0.2s;
   white-space: nowrap;
+}
+
+.create-post-btn {
+  background: #302536;
+}
+
+.create-post-btn:hover {
+  background: #514052;
+  transform: translateY(-2px);
+}
+
+.create-community-btn {
+  background: #e84b9b;
 }
 
 .create-community-btn:hover {
@@ -265,7 +287,7 @@
   cursor: not-allowed;
 }
 
-/* MODAL */
+/* MODAL OVERLAY */
 
 .modal-overlay {
   position: fixed;
@@ -277,6 +299,8 @@
   justify-content: center;
   padding: 20px;
 }
+
+/* CREATE COMMUNITY MODAL */
 
 .create-community-modal {
   width: 100%;
@@ -290,6 +314,57 @@
   animation: modalAppear 0.2s ease;
 }
 
+/* CREATE POST MODAL */
+
+.create-post-modal {
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 15px 50px rgba(50, 20, 40, 0.2);
+  animation: modalAppear 0.2s ease;
+}
+
+.post-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 25px;
+}
+
+.post-modal-header h2 {
+  color: #302536;
+  font-size: 23px;
+  margin: 0;
+}
+
+.post-modal-header .communities-subtitle {
+  margin-bottom: 8px;
+}
+
+.post-modal-hint {
+  color: #927f90;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.post-character-count {
+  align-self: flex-end;
+  color: #988a96;
+  font-size: 12px;
+  margin-top: -3px;
+}
+
+.post-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 25px;
+}
+
 @keyframes modalAppear {
   from {
     opacity: 0;
@@ -301,6 +376,8 @@
     transform: translateY(0);
   }
 }
+
+/* MODAL HEADER */
 
 .modal-header {
   display: flex;
@@ -342,7 +419,8 @@
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   width: 100%;
   padding: 13px 14px;
   border: 1px solid #eadce7;
@@ -350,6 +428,7 @@
   font-family: inherit;
   font-size: 13px;
   color: #302536;
+  background: white;
   outline: none;
   transition: 0.2s;
 }
@@ -359,7 +438,8 @@
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   border-color: #e84b9b;
   box-shadow: 0 0 0 3px rgba(232, 75, 155, 0.08);
 }
@@ -369,6 +449,8 @@
   font-size: 13px;
   margin-bottom: 15px;
 }
+
+/* MODAL ACTIONS */
 
 .modal-actions {
   display: flex;
@@ -439,6 +521,14 @@
   .community-page-tab {
     padding: 14px 10px;
   }
+
+  .communities-header-actions {
+    width: 100%;
+  }
+
+  .communities-header-actions button {
+    flex: 1;
+  }
 }
 
 @media (max-width: 480px) {
@@ -454,11 +544,13 @@
     grid-template-columns: 1fr;
   }
 
-  .create-community-modal {
+  .create-community-modal,
+  .create-post-modal {
     padding: 22px;
   }
 
-  .modal-actions {
+  .modal-actions,
+  .post-modal-actions {
     flex-direction: column-reverse;
   }
 

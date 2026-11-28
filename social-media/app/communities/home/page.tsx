@@ -1,3 +1,4 @@
+
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -17,6 +18,12 @@ type Comment = {
   content: string;
   createdAt: string;
   user: Author;
+};
+
+type Community = {
+  id: number;
+  name: string;
+  isJoined: boolean;
 };
 
 type Post = {
@@ -42,6 +49,7 @@ const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID;
 
 export default function CommunitiesHomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -63,12 +71,24 @@ export default function CommunitiesHomePage() {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // CREATE POST
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postContent, setPostContent] = useState("");
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
+
+  // FETCH POSTS
   async function fetchPosts() {
     try {
       const [postsResponse, bookmarksResponse] = await Promise.all([
-        fetch("/api/commmunities/home"),
+        fetch("/api/commmunities/home", {
+          cache: "no-store",
+        }),
         TEST_USER_ID
-          ? fetch(`/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`)
+          ? fetch(
+              `/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`
+            )
           : Promise.resolve(null),
       ]);
 
@@ -112,12 +132,59 @@ export default function CommunitiesHomePage() {
     }
   }
 
-  // FETCH POSTS
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      void fetchPosts();
-    });
-  }, []);
+  // FETCH JOINED COMMUNITIES
+  async function fetchJoinedCommunities() {
+    try {
+      const response = await fetch("/api/commmunities");
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Gagal mengambil communities"
+        );
+      }
+
+      const joinedCommunities = await Promise.all(
+        (result.data || []).map(async (community: Community) => {
+          try {
+            const membershipResponse = await fetch(
+              `/api/commmunities/${community.id}/membership`
+            );
+
+            const membershipResult = await membershipResponse.json();
+
+            return {
+              id: community.id,
+              name: community.name,
+              isJoined:
+                membershipResponse.ok && membershipResult.isMember,
+            };
+          } catch {
+            return {
+              id: community.id,
+              name: community.name,
+              isJoined: false,
+            };
+          }
+        })
+      );
+
+      setCommunities(joinedCommunities);
+    } catch (err) {
+      console.error("Fetch Joined Communities Error:", err);
+    }
+  }
+
+useEffect(() => {
+  const loadData = async () => {
+    await Promise.all([
+      fetchPosts(),
+      fetchJoinedCommunities(),
+    ]);
+  };
+
+  void loadData();
+}, []);
 
   function formatDate(date: string) {
     return new Date(date).toLocaleString("id-ID", {
@@ -127,6 +194,79 @@ export default function CommunitiesHomePage() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  // OPEN CREATE POST MODAL
+  function handleOpenPostModal() {
+    const joinedCommunities = communities.filter(
+      (community) => community.isJoined
+    );
+
+    setPostContent("");
+    setPostError("");
+
+    setSelectedCommunityId(
+      joinedCommunities.length > 0
+        ? String(joinedCommunities[0].id)
+        : ""
+    );
+
+    setShowPostModal(true);
+  }
+
+  // CREATE POST
+  async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!postContent.trim()) {
+      setPostError("Post content cannot be empty.");
+      return;
+    }
+
+    if (!selectedCommunityId) {
+      setPostError("Please join a community first.");
+      return;
+    }
+
+    try {
+      setPosting(true);
+      setPostError("");
+
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: postContent.trim(),
+          communityId: Number(selectedCommunityId),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Gagal membuat postingan"
+        );
+      }
+
+      setShowPostModal(false);
+      setPostContent("");
+      setSelectedCommunityId("");
+      setPostError("");
+
+      // REFRESH HOME POSTS
+      await fetchPosts();
+    } catch (err) {
+      setPostError(
+        err instanceof Error
+          ? err.message
+          : "Gagal membuat postingan"
+      );
+    } finally {
+      setPosting(false);
+    }
   }
 
   // LIKE POST
@@ -416,6 +556,8 @@ export default function CommunitiesHomePage() {
       setImage("");
       setFormError("");
 
+      await fetchJoinedCommunities();
+
       alert("Community created successfully!");
     } catch (err) {
       setFormError(
@@ -446,13 +588,23 @@ export default function CommunitiesHomePage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="create-community-btn"
-            onClick={() => setShowModal(true)}
-          >
-            + Create Community
-          </button>
+          <div className="communities-header-actions">
+            <button
+              type="button"
+              className="create-post-btn"
+              onClick={handleOpenPostModal}
+            >
+              + Post
+            </button>
+
+            <button
+              type="button"
+              className="create-community-btn"
+              onClick={() => setShowModal(true)}
+            >
+              + Create Community
+            </button>
+          </div>
         </div>
 
         {/* TABS */}
@@ -773,6 +925,128 @@ export default function CommunitiesHomePage() {
                   disabled={submitting}
                 >
                   {submitting ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE POST MODAL */}
+      {showPostModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!posting) setShowPostModal(false);
+          }}
+        >
+          <div
+            className="create-post-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="post-modal-header">
+              <div>
+                <p className="communities-subtitle">
+                  SHARE YOUR THOUGHTS
+                </p>
+
+                <h2>Create Post</h2>
+              </div>
+
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowPostModal(false)}
+                disabled={posting}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePost}>
+              <div className="form-group">
+                <label htmlFor="home-post-community">
+                  Choose Community *
+                </label>
+
+                <select
+                  id="home-post-community"
+                  value={selectedCommunityId}
+                  onChange={(event) =>
+                    setSelectedCommunityId(event.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select a community</option>
+
+                  {communities
+                    .filter((community) => community.isJoined)
+                    .map((community) => (
+                      <option
+                        key={community.id}
+                        value={community.id}
+                      >
+                        {community.name}
+                      </option>
+                    ))}
+                </select>
+
+                {communities.filter(
+                  (community) => community.isJoined
+                ).length === 0 && (
+                  <small className="post-modal-hint">
+                    You havent joined any communities yet. Join a
+                    community before creating a post.
+                  </small>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="home-post-content">
+                  Your Post *
+                </label>
+
+                <textarea
+                  id="home-post-content"
+                  value={postContent}
+                  onChange={(event) =>
+                    setPostContent(event.target.value)
+                  }
+                  placeholder="What's happening?"
+                  rows={6}
+                  maxLength={1000}
+                  required
+                />
+
+                <span className="post-character-count">
+                  {postContent.length}/1000
+                </span>
+              </div>
+
+              {postError && (
+                <p className="form-error">{postError}</p>
+              )}
+
+              <div className="post-modal-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => setShowPostModal(false)}
+                  disabled={posting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={
+                    posting ||
+                    !postContent.trim() ||
+                    !selectedCommunityId
+                  }
+                >
+                  {posting ? "Posting..." : "Post"}
                 </button>
               </div>
             </form>

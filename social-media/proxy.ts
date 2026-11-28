@@ -26,8 +26,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (loggedIn && (pathname.startsWith("/login") || pathname.startsWith("/signup"))) {
-    return NextResponse.redirect(new URL("/", req.url));
+  if (loggedIn && (pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/signup"))) {
+    return NextResponse.redirect(new URL("/home", req.url));
   }
 
   return NextResponse.next();

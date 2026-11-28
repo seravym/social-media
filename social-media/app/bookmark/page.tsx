@@ -22,8 +22,6 @@ type BookmarkPost = {
   bookmarkedAt: string;
 };
 
-const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID;
-
 export default function BookmarksPage() {
   const [posts, setPosts] = useState<BookmarkPost[]>([]);
   const [search, setSearch] = useState("");
@@ -31,23 +29,36 @@ export default function BookmarksPage() {
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  async function fetchBookmarks() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch("/api/bookmarks");
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Gagal mengambil bookmarks");
+      }
+
+      setPosts(result.data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat mengambil bookmarks"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     let ignore = false;
 
     async function loadBookmarks() {
-      if (!TEST_USER_ID) {
-        if (!ignore) {
-          setError("Test user ID belum dikonfigurasi.");
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
-        const response = await fetch(
-          `/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`
-        );
-
+        const response = await fetch("/api/bookmarks");
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -80,46 +91,12 @@ export default function BookmarksPage() {
     };
   }, []);
 
-  async function fetchBookmarks() {
-    if (!TEST_USER_ID) {
-      setError("Test user ID belum dikonfigurasi.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await fetch(
-        `/api/bookmarks?userId=${encodeURIComponent(TEST_USER_ID)}`
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Gagal mengambil bookmarks");
-      }
-
-      setPosts(result.data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan saat mengambil bookmarks"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleRemoveBookmark(postId: string) {
-    if (!TEST_USER_ID) return;
-
     try {
       setRemovingId(postId);
 
       const response = await fetch(
-        `/api/bookmarks?postId=${encodeURIComponent(postId)}&userId=${encodeURIComponent(TEST_USER_ID)}`,
+        `/api/bookmarks?postId=${encodeURIComponent(postId)}`,
         {
           method: "DELETE",
         }
@@ -150,7 +127,7 @@ export default function BookmarksPage() {
 
     return (
       post.content.toLowerCase().includes(keyword) ||
-      post.author.name.toLowerCase().includes(keyword) ||
+      (post.author.name || "").toLowerCase().includes(keyword) ||
       post.author.username.toLowerCase().includes(keyword)
     );
   });
@@ -235,17 +212,21 @@ export default function BookmarksPage() {
                   {post.author.avatarUrl ? (
                     <img
                       src={post.author.avatarUrl}
-                      alt={post.author.name}
+                      alt={post.author.name || post.author.username}
                       className="bookmark-avatar"
                     />
                   ) : (
                     <div className="bookmark-avatar-placeholder">
-                      {post.author.name.charAt(0).toUpperCase()}
+                      {(post.author.name || post.author.username)
+                        .charAt(0)
+                        .toUpperCase()}
                     </div>
                   )}
 
                   <div className="bookmark-author">
-                    <strong>{post.author.name}</strong>
+                    <strong>
+                      {post.author.name || post.author.username}
+                    </strong>
                     <span>@{post.author.username}</span>
                   </div>
 

@@ -108,7 +108,9 @@ function ListDetailContent() {
         <h2>List Information</h2>
 
         <p>
-          Created by: {list.owner?.name || "Unknown"}
+          Created by: {
+            list.owner?.name || `@${list.owner?.username}` || "Unknown"
+          }
         </p>
 
         <p>

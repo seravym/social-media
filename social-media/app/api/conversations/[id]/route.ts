@@ -60,8 +60,6 @@ export const GET = authed(async (user, _req, ctx: { params: Promise<{ id: string
 
   const dto: ConversationDetailDto = {
     id: conv.id,
-    type: conv.type,
-    name: conv.name ?? null,
     currentUserId: user.id,
     background: conv.background ?? null,
     other: otherMember ? toUserCard(otherMember.user) : null,
