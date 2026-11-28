@@ -25,12 +25,20 @@ export default function ProfilePage() {
         const rawHandle = draftUsername.trim() || "@username";
         const cleanHandle = rawHandle.startsWith("@") ? rawHandle : `@${rawHandle}`;  
       
-
       setDisplayName(cleanName);
       setUsername(cleanHandle);
-      setBio(draftBio.slice(0, 50));
+      setBio(draftBio.slice(0, 35));
       setIsEditOpen(false);
     };
+
+     const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 15);
+
+    setDraftUsername(sanitized ? `@${sanitized}` : "");
+  };
 
   return (
     <div className="profile-layout">
@@ -78,44 +86,65 @@ export default function ProfilePage() {
             {bio && <p className="profile-bio">{bio}</p>}
             <p className="profile-joined">bergabung sejak 2026</p>
           </div>
+          
         </section>
-
         <section className="profile-navigation">
           <div className="active">Posts</div>
           <div>Replies</div>
           <div>Likes</div>
         </section>
 
-        <section className="profile-posts">
+       <section className="profile-posts">
           <div className="post-item">
-            <p>
-              <strong>Nama Akun</strong> @username
-            </p>
-            <p>kenapa aku begadang terus??</p>
-            <div className = "post-actions">
+            <div className="post-header-row">
+              <img
+                src="/juhoon.jpg"
+                alt="Foto Profil"
+                className="post-avatar"
+              />
+              <div className="post-author-meta">
+                <strong className="post-display-name">{displayName}</strong>
+                <span className="post-username">{username}</span>
+              </div>
+            </div>
+
+            <div className="post-body">
+              <p>kenapa aku begadang terus??</p>
+              <div className="post-actions">
                 <span>💬 890</span>
                 <span>♡ 15</span>
                 <span>📊 1M</span>
                 <span>🔖</span>
+              </div>
             </div>
           </div>
         </section>
 
         <section className="profile-posts">
           <div className="post-item">
-            <p>
-              <strong>Nama Akun</strong> @username
-            </p>
-            <p> Bismillah Front-End A</p>
-            <div className = "post-actions">
+            <div className="post-header-row">
+              <img
+                src="/juhoon.jpg"
+                alt="Foto Profil"
+                className="post-avatar"
+              />
+              <div className="post-author-meta">
+                <strong className="post-display-name">{displayName}</strong>
+                <span className="post-username">{username}</span>
+              </div>
+            </div>
+
+            <div className="post-body">
+              <p>Bismillah Front-End A</p>
+              <div className="post-actions">
                 <span>💬 8</span>
                 <span>♡ 15</span>
                 <span>📊 1M</span>
                 <span>🔖</span>
+              </div>
             </div>
           </div>
         </section>
-
       </main>
 
       
@@ -174,12 +203,18 @@ export default function ProfilePage() {
             value= {draftName}
              onChange={(e) => setDraftName(e.target.value)}
             />
+
+
             <label className = "edit-label">Id Akun</label>
              <input type = "text" 
             className="edit-input" 
             value= {draftUsername}
-             onChange={(e) => setDraftUsername(e.target.value)}
+             onChange={handleUsernameChange}
+                placeholder="@username"
             />
+            <span className="edit-bio-counter">
+  {`${draftUsername.replace("@", "").length}/15`}
+</span>
             <label className = "edit-label">Bio</label>
             <textarea
             maxLength={35}

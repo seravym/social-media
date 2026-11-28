@@ -13,6 +13,7 @@ display:flex;
 
 .profile-page {
   width: 100%;
+  border: 5px;
 }
 
 /* Banner lebar penuh */
@@ -163,6 +164,7 @@ display:flex;
 }
 
 
+
 .profile-navigation div.active::after {
   content: "";
   position: absolute;
@@ -186,6 +188,8 @@ width: 100%;
   background-color: #fbf7f8;
   padding: 18px 24px 16px;
   margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
 }
 
 .post-top {
@@ -221,7 +225,7 @@ width: 100%;
 }
 
 .post-body {
-  margin: 0 0 18px;
+  margin-top: 10px;
   font-size: 15px;
   color: #181518;
 }
@@ -237,6 +241,219 @@ width: 100%;
 .post-actions span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  margin-top: 10px;
   cursor: pointer;
+}
+
+/* Overlay & Kartu Modal */
+.edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: rgba(24, 21, 24, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.edit-card {
+  width: 100%;
+  max-width: 780px;
+  border: 2px solid #7c3849;
+  background-color: #ead796;
+  overflow: hidden;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #181518;
+  border-bottom: 1.5px solid #7c3849;
+}
+
+.edit-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid #7c3849;
+  background-color: #cfaab2;
+  color: #181518;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Banner dalam Modal */
+.edit-banner-box {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  border-bottom: 1.5px solid #7c3849;
+  overflow: hidden;
+}
+
+.edit-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-banner-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.edit-icon-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #7c3849;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #181518;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Area Avatar & Form */
+.edit-modal-profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 20px 32px 28px;
+}
+
+.edit-avatar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.edit-avt-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #7c3849;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.edit-avt-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-plus-avt {
+  position: absolute;
+  right: -2px;
+  bottom: 2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid #5b2733;
+  background-color: #8b3a52;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.edit-form-col {
+  flex: 1;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #181518;
+  margin-bottom: 6px;
+}
+
+.edit-input {
+  height: 34px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid #7c3849;
+  background-color: #ffffff;
+  color: #181518;
+  margin-bottom: 12px;
+  outline: none;
+}
+
+.edit-textarea {
+  min-height: 76px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1.5px solid #7c3849;
+  background-color: #ffffff;
+  color: #181518;
+  resize: none;
+  font-size: 13px;
+  outline: none;
+}
+
+.edit-bio-counter {
+  align-self: flex-end;
+  font-size: 11px;
+  color: #3d3135;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.edit-save-btn {
+  align-self: center;
+  min-width: 130px;
+  padding: 8px 24px;
+  border-radius: 999px;
+  border: 1.5px solid #7c3849;
+  background-color: #ffffff;
+  color: #181518;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+align-items: center;
+  
+}
+
+.edit-save-btn:hover {
+  background-color: #cfaab2;
+}
+.post-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.post-author-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.post-display-name {
+  font-size: 15px;
+  color: #181518;
+}
+
+.post-username {
+  font-size: 13px;
+  color: #5a4a4e;
 }
