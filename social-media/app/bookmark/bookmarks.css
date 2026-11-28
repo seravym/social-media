@@ -353,3 +353,163 @@
     font-size: 19px;
   }
 }
+
+
+/* =================================
+   BOOKMARKS - SETTINGS THEME
+================================= */
+
+.bookmarks-page {
+  min-height: 100vh;
+  background: #eef1f7;
+  color: #252d3b;
+  border-right: 1px solid #e6eaf1;
+}
+
+/* HEADER */
+
+.bookmarks-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e6eaf1;
+  color: #252d3b;
+}
+
+.bookmarks-header h1,
+.bookmarks-header h2 {
+  color: #252d3b;
+}
+
+.bookmarks-header p {
+  color: #778397;
+}
+
+/* BACK BUTTON */
+
+.bookmarks-back-button {
+  color: #778397;
+  transition: 0.2s ease;
+}
+
+.bookmarks-back-button:hover {
+  color: #d94691;
+  background: #fdf1f7;
+}
+
+/* SEARCH */
+
+.bookmarks-search {
+  background: #f9fafd;
+  border: 1px solid #e1e6ef;
+  border-radius: 12px;
+}
+
+.bookmarks-search input {
+  background: transparent;
+  color: #252d3b;
+}
+
+.bookmarks-search input::placeholder {
+  color: #a0aaba;
+}
+
+.bookmarks-search:focus-within {
+  border-color: #e47caf;
+  box-shadow: 0 0 0 3px rgba(228, 124, 175, 0.12);
+}
+
+/* BOOKMARK CARD */
+
+.bookmark-card {
+  background: #ffffff;
+  border: 1px solid #e6eaf1;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(37, 45, 59, 0.04);
+  color: #252d3b;
+  transition: 0.2s ease;
+}
+
+.bookmark-card:hover {
+  border-color: #edc2d8;
+  box-shadow: 0 6px 18px rgba(37, 45, 59, 0.07);
+}
+
+.bookmark-card h2,
+.bookmark-card h3,
+.bookmark-card h4 {
+  color: #252d3b;
+}
+
+.bookmark-card p {
+  color: #4e596b;
+}
+
+/* AUTHOR */
+
+.bookmark-author {
+  color: #252d3b;
+}
+
+.bookmark-author small,
+.bookmark-author span {
+  color: #778397;
+}
+
+/* POST FOOTER */
+
+.bookmark-card button {
+  transition: 0.2s ease;
+}
+
+.bookmark-card button:hover {
+  color: #d94691;
+}
+
+/* REMOVE BOOKMARK */
+
+.bookmark-remove-button {
+  color: #778397;
+}
+
+.bookmark-remove-button:hover {
+  color: #d94691;
+  background: #fdf1f7;
+}
+
+/* EMPTY STATE */
+
+.bookmarks-empty {
+  background: #ffffff;
+  border: 1px solid #e6eaf1;
+  border-radius: 16px;
+  color: #778397;
+}
+
+.bookmarks-empty h2,
+.bookmarks-empty h3 {
+  color: #252d3b;
+}
+
+/* LOADING */
+
+.bookmarks-loading {
+  color: #778397;
+}
+
+.bookmarks-spinner {
+  border-color: #f1c8dc;
+  border-top-color: #d94691;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+  .bookmarks-header {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .bookmark-card {
+    border-radius: 14px;
+  }
+}
+
