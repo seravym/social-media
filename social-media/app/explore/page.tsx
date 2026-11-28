@@ -44,7 +44,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
         <>
         {parts.map((p, i) =>
             i % 2 === 1 ? (
-            <mark key={i} className="bg-pink-100 text-inherit">
+            <mark key={i} className="rounded bg-[#f8e8ed] text-inherit">
                 {p}
             </mark>
             ) : (
@@ -57,7 +57,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 function Avatar({ name }: { name: string }) {
     return (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f8e8ed] font-bold text-[#b85c7a]">
         {name.charAt(0).toUpperCase()}
         </div>
     );
@@ -215,7 +215,7 @@ export default function ExplorePage() {
 
     const section = (title: string, children: React.ReactNode) => (
         <section className="mb-8">
-        <h2 className="mb-3 text-xl font-bold">{title}</h2>
+        <h2 className="mb-3 text-xl font-bold text-slate-900">{title}</h2>
         {children}
         </section>
     );
@@ -236,7 +236,7 @@ export default function ExplorePage() {
                 onBlur={() => setFocused(false)}
                 onKeyDown={(e) => e.key === "Enter" && saveSearch(query)}
                 placeholder="Cari topik, akun, atau postingan"
-                className="w-full rounded-full bg-gray-100 px-5 py-3 text-base outline-none focus:bg-white focus:ring-2 focus:ring-pink-400"
+                className="w-full rounded-full border border-gray-200 bg-white/80 px-5 py-3 text-base outline-none transition focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-200"
             />
 
             {focused && !searching && history.length > 0 && (
@@ -280,10 +280,10 @@ export default function ExplorePage() {
             <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 pb-3 text-base font-semibold ${
+                className={`flex-1 pb-3 text-base font-semibold transition ${
                 tab === t
-                    ? "border-b-2 border-pink-600 text-pink-600"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "border-b-2 border-[#b85c7a] text-[#b85c7a]"
+                    : "text-gray-500 hover:text-[#b85c7a]"
                 }`}
             >
                 {t}
@@ -326,7 +326,7 @@ export default function ExplorePage() {
                                 setQuery(t.name);
                                 setTab("Explore");
                             }}
-                            className="text-left text-base font-bold hover:text-pink-600">
+                            className="text-left text-base font-bold transition hover:text-[#b85c7a]">
                             <Highlight text={t.name} query={query} />
                         </button>
                         <p className="text-sm text-gray-500">{formatCount(t.postCount)}</p>
@@ -355,10 +355,10 @@ export default function ExplorePage() {
                             type="button"
                             onClick={() => toggleFollow(a.id)}
                             disabled={!!followLoading[a.id]}
-                            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                                 following[a.id]
-                                    ? "border border-gray-300 bg-white text-gray-700"
-                                    : "bg-pink-600 text-white hover:bg-pink-700"
+                                    ? "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                    : "bg-[#b85c7a] text-white hover:bg-[#9e4865]"
                             } disabled:opacity-50`}
                         >
                             {followLoading[a.id]
