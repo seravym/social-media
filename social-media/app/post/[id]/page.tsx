@@ -95,6 +95,27 @@ function PostDetailContent() {
     }
   };
 
+  const handleToggleBookmark = async () => {
+  if (!post) return;
+  try {
+    const res = await fetch(`/api/posts/${post.id}/bookmark`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Gagal memproses bookmark");
+      return;
+    }
+
+    setPost((prev) =>
+      prev ? { ...prev, isBookmarked: data.bookmarked } : null
+    );
+  } catch {
+    alert("Terjadi kesalahan saat memproses bookmark");
+  }
+};
+
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !post) return;
@@ -174,7 +195,7 @@ function PostDetailContent() {
           {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views} Views
         </p>
         <div className="post-actions">
-          <span>💬 {post.repliesCount} Balasan</span>
+          <span>💬 {post.repliesCount}</span>
           <button
             className={`action-btn ${post.isLiked ? "liked" : ""}`}
             onClick={handleToggleLike}
@@ -182,7 +203,13 @@ function PostDetailContent() {
             {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
           </button>
           <button className="action-btn danger" onClick={handleDeletePost}>
-            🗑️ Hapus
+            🗑️ Delete
+          </button>
+          <button
+            className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
+            onClick={handleToggleBookmark}
+          >
+            {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
           </button>
         </div>
       </article>
