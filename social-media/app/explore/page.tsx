@@ -16,7 +16,17 @@ type Post = {
     views: number;
     createdAt: string;
     author: Account;
+    _count: {
+        comments: number;
+        likes: number;
+    };
 };
+
+type ExploreComment = {
+    id: string;
+    content: string;
+};
+
 type HistoryItem = { id: string; query: string };
 
 const TABS = ["Explore", "Trending", "News", "Sports", "Entertainment"] as const;
@@ -44,7 +54,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
         <>
         {parts.map((p, i) =>
             i % 2 === 1 ? (
-            <mark key={i} className="bg-pink-100 text-inherit">
+            <mark key={i} className="rounded bg-[#f8e8ed] text-inherit">
                 {p}
             </mark>
             ) : (
@@ -57,7 +67,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 function Avatar({ name }: { name: string }) {
     return (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f8e8ed] font-bold text-[#b85c7a]">
         {name.charAt(0).toUpperCase()}
         </div>
     );
@@ -69,6 +79,11 @@ export default function ExplorePage() {
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
+    const [commentOpen, setCommentOpen] = useState<Record<string, boolean>>({});
+    const [commentText, setCommentText] = useState<Record<string, string>>({});
+    const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({});
+    const [newComments, setNewComments] = useState<Record<string, ExploreComment[]>>({});
+    const [likeLoading, setLikeLoading] = useState<Record<string, boolean>>({});
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [following, setFollowing] = useState<Record<string, boolean>>({});
     const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
@@ -206,6 +221,103 @@ export default function ExplorePage() {
     const shownPosts = compact ? allPosts.slice(0, 5) : allPosts;
     const showAccounts = (tab === "Explore" || searching) && accounts.length > 0;
 
+    const handleLikePost = async (postId: string) => {
+        if (likeLoading[postId]) return;
+        setLikeLoading((prev) => ({
+            ...prev,
+            [postId]: true,
+        }));
+        try {
+            const res = await fetch(`/api/posts/${postId}/like`, {
+                method: "POST",
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || "Gagal memproses like");
+                return;
+            }
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            _count: {
+                                ...post._count,
+                                likes: data.liked
+                                    ? post._count.likes + 1
+                                    : Math.max(0, post._count.likes - 1),
+                            },
+                        }
+                        : post
+                )
+            );
+        } catch {
+            alert("Terjadi kesalahan saat memproses like");
+        } finally {
+            setLikeLoading((prev) => ({
+                ...prev,
+                [postId]: false,
+            }));
+        }
+    };
+
+    const handleAddComment = async (postId: string) => {
+        const content = commentText[postId]?.trim();
+
+        if (!content || commentLoading[postId]) return;
+
+        setCommentLoading((prev) => ({
+            ...prev,
+            [postId]: true,
+        }));
+        try {
+            const res = await fetch(`/api/posts/${postId}/comments`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ content }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || "Gagal mengirim komentar");
+                return;
+            }
+            const comment: ExploreComment = {
+                id: data.comment?.id ?? `${postId}-${Date.now()}`,
+                content: data.comment?.content ?? content,
+            };
+            setNewComments((prev) => ({
+                ...prev,
+                [postId]: [comment, ...(prev[postId] ?? [])],
+            }));
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            _count: {
+                                ...post._count,
+                                comments: post._count.comments + 1,
+                            },
+                        }
+                        : post
+                )
+            );
+            setCommentText((prev) => ({
+                ...prev,
+                [postId]: "",
+            }));
+        } catch {
+            alert("Terjadi kesalahan saat mengirim komentar");
+        } finally {
+            setCommentLoading((prev) => ({
+                ...prev,
+                [postId]: false,
+            }));
+        }
+    };
+
     const nothing =
         !loading &&
         !shownNews.length &&
@@ -215,7 +327,7 @@ export default function ExplorePage() {
 
     const section = (title: string, children: React.ReactNode) => (
         <section className="mb-8">
-        <h2 className="mb-3 text-xl font-bold">{title}</h2>
+        <h2 className="mb-3 text-lg font-bold text-slate-900 sm:text-xl">{title}</h2>
         {children}
         </section>
     );
@@ -223,12 +335,12 @@ export default function ExplorePage() {
     return (
     <div className="bg-dot-canvas min-h-dvh text-slate-900">
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-    <main className="glass-panel overflow-hidden rounded-2xl p-5">
-        <div className="relative mb-4 flex items-center gap-4">
+    <main className="glass-panel min-w-0 overflow-hidden rounded-2xl p-3 sm:p-5">
+        <div className="relative mb-4 flex min-w-0 items-center gap-2 sm:gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
             </Link>
-            <div className="relative w-full">
+            <div className="relative min-w-0 flex-1">
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -236,7 +348,7 @@ export default function ExplorePage() {
                 onBlur={() => setFocused(false)}
                 onKeyDown={(e) => e.key === "Enter" && saveSearch(query)}
                 placeholder="Cari topik, akun, atau postingan"
-                className="w-full rounded-full bg-gray-100 px-5 py-3 text-base outline-none focus:bg-white focus:ring-2 focus:ring-pink-400"
+                className="w-full rounded-full border border-gray-200 bg-white/80 px-5 py-3 text-base outline-none transition focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-200"
             />
 
             {focused && !searching && history.length > 0 && (
@@ -275,15 +387,15 @@ export default function ExplorePage() {
             </div>
         </div>
 
-        <div className="mb-6 flex border-b border-gray-200">
+        <div className="mb-6 flex overflow-x-auto border-b border-gray-200">
             {TABS.map((t) => (
             <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 pb-3 text-base font-semibold ${
+                className={`flex-none whitespace-nowrap px-3 pb-3 text-sm font-semibold transition sm:flex-1 sm:px-0 sm:text-base ${
                 tab === t
-                    ? "border-b-2 border-pink-600 text-pink-600"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "border-b-2 border-[#b85c7a] text-[#b85c7a]"
+                    : "text-gray-500 hover:text-[#b85c7a]"
                 }`}
             >
                 {t}
@@ -292,7 +404,6 @@ export default function ExplorePage() {
         </div>
 
         {loading && <p className="py-8 text-center text-gray-500">Memuat...</p>}
-
         {!loading && (
             <>
             {shownNews.length > 0 &&
@@ -301,9 +412,12 @@ export default function ExplorePage() {
                 <ul className="space-y-4">
                     {shownNews.map((n) => (
                     <li key={n.id} className="border-b border-gray-100 pb-3">
-                        <p className="text-base font-bold">
-                        <Highlight text={n.title} query={query} />
-                        </p>
+                        <Link
+                            href={`/explore/detail?type=news&id=${encodeURIComponent(n.id)}`}
+                            className="text-left text-base font-bold transition hover:text-[#b85c7a]"
+                        >
+                            <Highlight text={n.title} query={query} />
+                        </Link>
                         <p className="mt-1 text-sm text-gray-500">
                         {timeAgo(n.createdAt)} · {n.category} · {formatCount(n.postCount)}
                         </p>
@@ -311,31 +425,27 @@ export default function ExplorePage() {
                     ))}
                 </ul>
                 )}
-
             {shownTrending.length > 0 &&
                 section(
                 "Trending",
                 <ol className="space-y-4">
                     {shownTrending.map((t, i) => (
-                    <li key={t.id} className="flex gap-4 border-b border-gray-100 pb-3">
+                    <li key={t.id} className="flex min-w-0 gap-2 border-b border-gray-100 pb-3 sm:gap-4">
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
-                        <div>
+                        <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
-                        <button type="button"
-                            onClick={() => {
-                                setQuery(t.name);
-                                setTab("Explore");
-                            }}
-                            className="text-left text-base font-bold hover:text-pink-600">
+                        <Link
+                            href={`/explore/detail?type=trending&id=${encodeURIComponent(t.id)}`}
+                            className="text-left text-base font-bold transition hover:text-[#b85c7a]"
+                        >
                             <Highlight text={t.name} query={query} />
-                        </button>
+                        </Link>
                         <p className="text-sm text-gray-500">{formatCount(t.postCount)}</p>
                         </div>
                     </li>
                     ))}
                 </ol>
                 )}
-
             {showAccounts &&
                 section(
                 "Akun untuk diikuti",
@@ -344,21 +454,27 @@ export default function ExplorePage() {
                     <li key={a.id} className="flex items-center gap-3 border-b border-gray-100 pb-3">
                         <Avatar name={a.name ?? a.username} />
                         <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold">
+                            <Link
+                                href={`/profile/${a.id}`}
+                                className="text-base font-bold transition hover:text-[#b85c7a]"
+                            >
                                 <Highlight text={a.name ?? a.username} query={query} />
-                            </p>
-                            <p className="text-sm text-gray-500">
+                            </Link>
+                            <Link
+                                href={`/profile/${a.id}`}
+                                className="block text-sm text-gray-500 hover:text-[#b85c7a]"
+                            >
                                 @<Highlight text={a.username} query={query} />
-                            </p>
+                            </Link>
                         </div>
                         <button
                             type="button"
                             onClick={() => toggleFollow(a.id)}
                             disabled={!!followLoading[a.id]}
-                            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                                 following[a.id]
-                                    ? "border border-gray-300 bg-white text-gray-700"
-                                    : "bg-pink-600 text-white hover:bg-pink-700"
+                                    ? "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                    : "bg-[#b85c7a] text-white hover:bg-[#9e4865]"
                             } disabled:opacity-50`}
                         >
                             {followLoading[a.id]
@@ -371,36 +487,105 @@ export default function ExplorePage() {
                     ))}
                 </ul>
                 )}
-
             {shownPosts.length > 0 &&
                 section(
                 "Postingan populer",
                 <ul className="space-y-4">
                     {shownPosts.map((p) => (
-                    <li key={p.id} className="flex gap-3 border-b border-gray-100 pb-4">
+                    <li key={p.id} className="flex min-w-0 gap-2 border-b border-gray-100 pb-4 sm:gap-3">
                         <Avatar name={p.author.name ?? p.author.username} />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-500">
-                            <span className="text-base font-bold text-gray-900">
-                            <Highlight text={p.author.name ?? p.author.username} query={query} />
-                            </span>{" "}
+                            <Link
+                                href={`/profile/${p.author.id}`}
+                                className="text-base font-bold text-gray-900 hover:text-[#b85c7a]"
+                            >
+                                <Highlight text={p.author.name ?? p.author.username} query={query} />
+                            </Link>{" "}
                             @{p.author.username} · {timeAgo(p.createdAt)} ·{" "}
                             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">
                             {p.category}
                             </span>
                         </p>
-                        <p className="mt-1 text-base">
+                        <Link
+                            href={`/post/${p.id}?from=explore`}
+                            className="mt-1 block text-base hover:text-[#b85c7a]"
+                        >
                             <Highlight text={p.content} query={query} />
-                        </p>
-                        <p className="mt-2 text-sm text-gray-500">
-                            💬 {p.replyCount} · ♡ {p.likeCount} · 📊 {p.views}
-                        </p>
+                        </Link>
+                            <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCommentOpen((prev) => ({
+                                            ...prev,
+                                            [p.id]: !prev[p.id],
+                                        }))
+                                    }
+                                    className="transition hover:text-[#b85c7a]"
+                                >
+                                    💬 {p._count.comments}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleLikePost(p.id)}
+                                    disabled={!!likeLoading[p.id]}
+                                    className="transition hover:text-[#b85c7a] disabled:opacity-50"
+                                >
+                                    {likeLoading[p.id] ? "Memproses..." : `♡ ${p._count.likes}`}
+                                </button>
+                                <span>📊 {p.views}</span>
+                            </div>
+                            {commentOpen[p.id] && (
+                                <div className="mt-3 space-y-3">
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            handleAddComment(p.id);
+                                        }}
+                                        className="space-y-2"
+                                    >
+                                        <textarea
+                                            value={commentText[p.id] ?? ""}
+                                            onChange={(e) =>
+                                                setCommentText((prev) => ({
+                                                    ...prev,
+                                                    [p.id]: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="Tulis komentar..."
+                                            rows={2}
+                                            disabled={!!commentLoading[p.id]}
+                                            className="w-full resize-none rounded-xl border border-gray-200 bg-white/80 p-3 text-sm outline-none focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-100"
+                                        />
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="submit"
+                                                disabled={
+                                                    !!commentLoading[p.id] ||
+                                                    !(commentText[p.id] ?? "").trim()
+                                                }
+                                                className="rounded-full bg-[#b85c7a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9e4865] disabled:opacity-50"
+                                            >
+                                                {commentLoading[p.id] ? "Mengirim..." : "Reply"}
+                                            </button>
+                                        </div>
+                                    </form>
+                                    {(newComments[p.id] ?? []).map((comment) => (
+                                        <div
+                                            key={comment.id}
+                                            className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                                        >
+                                            {comment.content}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </li>
                     ))}
                 </ul>
                 )}
-
             {nothing && (
                 <p className="py-8 text-center text-gray-500">
                 {searching ? `Tidak ada hasil untuk "${query.trim()}".` : "Belum ada konten."}

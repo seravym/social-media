@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { MessageCircle, Heart, BarChart2, Bookmark, Trash2 } from "lucide-react";
 import "../../home/home.css";
 
 
@@ -43,16 +43,16 @@ function PostDetailContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const hasFetchedId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!postId) return;
-    let cancelled = false;
+    if (!postId || hasFetchedId.current === postId) return;
+    hasFetchedId.current = postId;
 
     async function loadPostDetail() {
       try {
         const res = await fetch(`/api/posts/${postId}`);
         const data = await res.json();
-        if (cancelled) return;
 
         if (!res.ok) {
           setErrorMsg(data.error || "Postingan tidak ditemukan");
@@ -60,17 +60,22 @@ function PostDetailContent() {
           setPost(data.post);
         }
       } catch {
-        if (!cancelled) setErrorMsg("Gagal memuat detail postingan");
+        setErrorMsg("Gagal memuat detail postingan");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
 
     loadPostDetail();
-    return () => {
-      cancelled = true;
-    };
   }, [postId]);
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/home");
+    }
+  };
 
   const handleToggleLike = async () => {
     if (!post) return;
@@ -94,6 +99,27 @@ function PostDetailContent() {
       alert("Terjadi kesalahan saat memproses like");
     }
   };
+
+  const handleToggleBookmark = async () => {
+  if (!post) return;
+  try {
+    const res = await fetch(`/api/posts/${post.id}/bookmark`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Gagal memproses bookmark");
+      return;
+    }
+
+    setPost((prev) =>
+      prev ? { ...prev, isBookmarked: data.bookmarked } : null
+    );
+  } catch {
+    alert("Terjadi kesalahan saat memproses bookmark");
+  }
+};
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,86 +173,119 @@ function PostDetailContent() {
   if (loading) return <div className="feed-layout"><p className="status-text">Memuat detail postingan...</p></div>;
   if (errorMsg || !post) {
     return (
-      <div className="feed-layout">
-        <p className="error-text">{errorMsg || "Postingan tidak ditemukan"}</p>
-        <div style={{ padding: "16px" }}>
-          <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
-        </div>
+      <div style={{ padding: "16px" }}>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="feed-nav-link"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          ← Kembali
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="feed-layout">
-      <nav className="feed-nav">
-        <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
-      </nav>
-
-      <article className="post-detail-card">
-        <div className="post-meta">
-          <span className="post-author-name">
-            {post.author.name || post.author.username}
-          </span>
-          <span className="post-author-handle">@{post.author.username}</span>
-        </div>
-        <p className="post-content" style={{ fontSize: "1.1rem" }}>{post.content}</p>
-        <p className="post-time" style={{ marginBottom: "12px" }}>
-          {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views} Views
-        </p>
-        <div className="post-actions">
-          <span>💬 {post.repliesCount} Balasan</span>
+    <div className="min-h-screen bg-dot-canvas px-4 py-6">
+      <div className="feed-layout">
+        <nav className="feed-nav">
           <button
-            className={`action-btn ${post.isLiked ? "liked" : ""}`}
-            onClick={handleToggleLike}
+            type="button"
+            onClick={handleBack}
+            className="feed-nav-link"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
+            ← Back
           </button>
-          <button className="action-btn danger" onClick={handleDeletePost}>
-            🗑️ Hapus
-          </button>
-        </div>
-      </article>
+        </nav>
 
-      <form onSubmit={handleAddComment} className="composer-form">
-        <textarea
-          className="composer-textarea"
-          placeholder="Post your reply"
-          rows={3}
-          value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
-          disabled={submitting}
-        />
-        <div className="composer-actions">
-          <button
-            type="submit"
-            className="btn-pink"
-            disabled={submitting || !replyText.trim()}
-          >
-            {submitting ? "Mengirim..." : "Reply"}
-          </button>
-        </div>
-      </form>
+        <article className="post-detail-card">
+          <div className="post-meta">
+            <span className="post-author-name">
+              {post.author.name || post.author.username}
+            </span>
+            <span className="post-author-handle">@{post.author.username}</span>
+          </div>
+          <p className="post-content" style={{ fontSize: "1.1rem" }}>{post.content}</p>
+          <p className="post-time" style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>{new Date(post.createdAt).toLocaleString("id-ID")} ·</span>
+            <BarChart2 size={15} strokeWidth={1.9} />
+            <span>{post.views} Views</span>
+          </p>
+          <div className="post-actions">
+            <span className="action-stat">
+              <MessageCircle size={16} strokeWidth={1.9} /> {post.repliesCount}
+            </span>
+            <button
+              className={`action-btn ${post.isLiked ? "liked" : ""}`}
+              onClick={handleToggleLike}
+            >
+              <Heart
+                size={16}
+                strokeWidth={1.9}
+                fill={post.isLiked ? "currentColor" : "none"}
+              />{" "}
+              {post.likesCount}
+            </button>
+            <button className="action-btn danger" onClick={handleDeletePost}>
+              <Trash2 size={16} strokeWidth={1.9} /> Delete
+            </button>
+            <button
+              className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
+              onClick={handleToggleBookmark}
+            >
+              <Bookmark
+                size={16}
+                strokeWidth={1.9}
+                fill={post.isBookmarked ? "currentColor" : "none"}
+              />
+              {post.isBookmarked ? "Saved" : "Save"}
+            </button>
+          </div>
+        </article>
 
-      <section>
-        {post.comments.length === 0 ? (
-          <p className="status-text">Belum ada balasan.</p>
-        ) : (
-          post.comments.map((c) => (
-            <div key={c.id} className="comment-item">
-              <div className="post-meta">
-                <span className="post-author-name">
-                  {c.user.name || c.user.username}
-                </span>
-                <span className="post-author-handle">@{c.user.username}</span>
-                <span className="post-time">
-                  · {new Date(c.createdAt).toLocaleString("id-ID")}
-                </span>
+        <form onSubmit={handleAddComment} className="composer-form">
+          <textarea
+            className="composer-textarea"
+            placeholder="Post your reply"
+            rows={3}
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            disabled={submitting}
+          />
+          <div className="composer-actions">
+            <button
+              type="submit"
+              className="btn-pink"
+              disabled={submitting || !replyText.trim()}
+            >
+              {submitting ? "Mengirim..." : "Reply"}
+            </button>
+          </div>
+        </form>
+
+        <section>
+          {post.comments.length === 0 ? (
+            <p className="status-text">Belum ada balasan.</p>
+          ) : (
+            post.comments.map((c) => (
+              <div key={c.id} className="comment-item">
+                <div className="post-meta">
+                  <span className="post-author-name">
+                    {c.user.name || c.user.username}
+                  </span>
+                  <span className="post-author-handle">@{c.user.username}</span>
+                  <span className="post-time">
+                    · {new Date(c.createdAt).toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <p className="post-content" style={{ marginBottom: 0 }}>{c.content}</p>
               </div>
-              <p className="post-content" style={{ marginBottom: 0 }}>{c.content}</p>
-            </div>
-          ))
-        )}
-      </section>
+            ))
+          )}
+        </section>
+      </div>
     </div>
   );
 }

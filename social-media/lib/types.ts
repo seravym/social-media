@@ -15,6 +15,18 @@ export interface NotificationDto {
   createdAt: string;
 }
 
+export interface ChatReactionDto {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
+export interface ChatReplyDto {
+  id: string;
+  senderId: string;
+  body: string;
+}
+
 export interface ChatMessageDto {
   id: string;
   senderId: string;
@@ -24,6 +36,9 @@ export interface ChatMessageDto {
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
+  pinnedAt?: string | null;
+  replyTo?: ChatReplyDto | null;
+  reactions?: ChatReactionDto[];
 }
 
 export interface ConversationMemberDto {

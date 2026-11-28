@@ -71,19 +71,30 @@ async function main() {
         ids.set(u.username, user.id);
     }
 
-    if ((await prisma.explorePost.count()) === 0) {
-        const now = Date.now();
-        await prisma.explorePost.createMany({
-        data: POSTS.map((p, i) => ({
-            content: p.content,
-            category: p.category,
-            replyCount: p.replyCount,
-            likeCount: p.likeCount,
-            views: p.views,
-            authorId: ids.get(p.author)!,
-            createdAt: new Date(now - (i + 1) * 60 * 60 * 1000),
-        })),
-    });
+    const now = Date.now();
+
+    for (const [i, p] of POSTS.entries()) {
+        const authorId = ids.get(p.author)!;
+
+        const existingPost = await prisma.post.findFirst({
+            where: {
+                authorId,
+                content: p.content,
+            },
+        });
+
+        if (!existingPost) {
+            await prisma.post.create({
+                data: {
+                    content: p.content,
+                    views: p.views,
+                    authorId,
+                    createdAt: new Date(
+                        now - (i + 1) * 60 * 60 * 1000
+                    ),
+                },
+            });
+        }
     }
 
     console.log("Seed Explore selesai");

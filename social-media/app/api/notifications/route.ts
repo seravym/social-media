@@ -6,10 +6,32 @@ import type { NotificationDto } from "@/lib/types";
 export const GET = authed(async (user, req) => {
   const tab = new URL(req.url).searchParams.get("tab");
 
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId: user.id },
+    select: {
+      notifyLikes: true,
+      notifyFollows: true,
+      notifyReplies: true,
+    },
+  });
+
+  const allowedTypes: string[] = [];
+  if (!settings || settings.notifyLikes) allowedTypes.push("like");
+  if (!settings || settings.notifyFollows) allowedTypes.push("follow");
+  if (!settings || settings.notifyReplies) {
+    allowedTypes.push("reply", "mention");
+  }
+  allowedTypes.push("system");
+
+  const baseWhere = {
+    userId: user.id,
+    type: { in: allowedTypes },
+  };
+
   const [rows, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where: {
-        userId: user.id,
+        ...baseWhere,
         ...(tab === "mentions" ? { type: "mention" } : {}),
         ...(tab === "unread" ? { isRead: false } : {}),
       },
@@ -18,7 +40,7 @@ export const GET = authed(async (user, req) => {
       take: 100,
     }),
     prisma.notification.count({
-      where: { userId: user.id, isRead: false },
+      where: { ...baseWhere, isRead: false },
     }),
   ]);
 

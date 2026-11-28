@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { resolveUserId } from "@/lib/route";
+import { clearNotification, notifyUser } from "@/lib/notify";
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { followingId } = body;
-    const followerId = (await getSessionUserId()) || body.userId;
+    const followerId = await resolveUserId(body.userId);
 
     if (!followerId) {
       return NextResponse.json(
@@ -104,6 +106,11 @@ export async function POST(request: NextRequest) {
       await prisma.follow.delete({
         where: { id: existingFollow.id },
       });
+      await clearNotification({
+        userId: followingId,
+        actorId: followerId,
+        type: "follow",
+      });
       return NextResponse.json({ following: false });
     }
 
@@ -112,6 +119,11 @@ export async function POST(request: NextRequest) {
         followerId,
         followingId,
       },
+    });
+    await notifyUser({
+      userId: followingId,
+      actorId: followerId,
+      type: "follow",
     });
 
     return NextResponse.json({ following: true });

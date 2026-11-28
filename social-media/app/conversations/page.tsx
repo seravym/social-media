@@ -48,9 +48,9 @@ export default function ConversationsPage() {
   const [sendError, setSendError] = useState<{
     body: string;
     imageUrl: string | null;
+    replyToId: string | null;
   } | null>(null);
   const selectedIdRef = useRef<string | null>(null);
-  const messagesRef = useRef<ChatMessageDto[]>([]);
 
   const selectedChat = conversations.find((c) => c.id === selectedId) ?? null;
   const isSelfNotes = selectedId === "self-notes";
@@ -58,10 +58,6 @@ export default function ConversationsPage() {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   const loadConversations = async () => {
     try {
@@ -97,13 +93,7 @@ export default function ConversationsPage() {
       const id = selectedIdRef.current;
       if (!id || id === "self-notes") return;
 
-      const current = messagesRef.current;
-      const last = current[current.length - 1];
-      const url = last
-        ? `/api/conversations/${id}/messages?after=${encodeURIComponent(
-            last.createdAt,
-          )}&limit=50`
-        : `/api/conversations/${id}/messages?limit=30`;
+      const url = `/api/conversations/${id}/messages?limit=30`;
 
       try {
         const res = await fetch(url, { cache: "no-store" });
@@ -118,10 +108,16 @@ export default function ConversationsPage() {
         );
         void fetch(`/api/conversations/${id}/read`, { method: "POST" });
         setMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
+          const incomingById = new Map(incoming.map((m) => [m.id, m]));
+          const merged = prev.map((m) => incomingById.get(m.id) ?? m);
+          const seen = new Set(merged.map((m) => m.id));
           const fresh = incoming.filter((m) => !seen.has(m.id));
-          if (fresh.length === 0) return prev;
-          return [...prev, ...fresh];
+          if (fresh.length === 0 && merged.every((m, i) => m === prev[i])) {
+            return prev;
+          }
+          return [...merged, ...fresh].sort((a, b) =>
+            a.createdAt.localeCompare(b.createdAt),
+          );
         });
       } catch {
         return;
@@ -259,7 +255,11 @@ export default function ConversationsPage() {
     setPreviewSettings(null);
   };
 
-  const handleSendMessage = async (body: string, imageUrl: string | null) => {
+  const handleSendMessage = async (
+    body: string,
+    imageUrl: string | null,
+    replyToId: string | null = null,
+  ) => {
     if (!selectedId) return;
 
     if (selectedId === "self-notes") {
@@ -288,6 +288,9 @@ export default function ConversationsPage() {
     setSendError(null);
     const conversationId = selectedId;
     const tempId = `temp_${Date.now()}`;
+    const replySource = replyToId
+      ? messages.find((m) => m.id === replyToId) ?? null
+      : null;
     const optimisticMessage: ChatMessageDto = {
       id: tempId,
       senderId: currentUserId,
@@ -297,6 +300,15 @@ export default function ConversationsPage() {
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
+      replyTo: replySource
+        ? {
+            id: replySource.id,
+            senderId: replySource.senderId,
+            body: replySource.deletedAt ? "" : replySource.body,
+          }
+        : null,
+      reactions: [],
+      pinnedAt: null,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
@@ -305,12 +317,12 @@ export default function ConversationsPage() {
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, imageUrl }),
+        body: JSON.stringify({ body, imageUrl, replyToId }),
       });
       if (selectedIdRef.current !== conversationId) return;
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        setSendError({ body, imageUrl });
+        setSendError({ body, imageUrl, replyToId });
         return;
       }
       const created = (await res.json()) as ChatMessageDto;
@@ -328,7 +340,7 @@ export default function ConversationsPage() {
     } catch {
       if (selectedIdRef.current !== conversationId) return;
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
-      setSendError({ body, imageUrl });
+      setSendError({ body, imageUrl, replyToId });
     }
   };
 
@@ -336,7 +348,7 @@ export default function ConversationsPage() {
     if (!sendError) return;
     const payload = sendError;
     setSendError(null);
-    void handleSendMessage(payload.body, payload.imageUrl);
+    void handleSendMessage(payload.body, payload.imageUrl, payload.replyToId);
   };
 
   const handleRetryLoad = () => {
@@ -457,6 +469,113 @@ export default function ConversationsPage() {
     }
   };
 
+  const handleReactMessage = async (messageId: string, emoji: string) => {
+    if (isSelfNotes) {
+      setSelfMessages((prev) => {
+        const next = prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const current = m.reactions ?? [];
+          const existing = current.find((r) => r.mine);
+          if (existing && existing.emoji === emoji) {
+            return {
+              ...m,
+              reactions: current
+                .map((r) =>
+                  r.emoji === emoji
+                    ? { ...r, count: r.count - 1, mine: false }
+                    : r,
+                )
+                .filter((r) => r.count > 0),
+            };
+          }
+          const withoutMine = current
+            .map((r) => (r.mine ? { ...r, count: r.count - 1, mine: false } : r))
+            .filter((r) => r.count > 0);
+          const target = withoutMine.find((r) => r.emoji === emoji);
+          if (target) {
+            return {
+              ...m,
+              reactions: withoutMine.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count + 1, mine: true } : r,
+              ),
+            };
+          }
+          return {
+            ...m,
+            reactions: [...withoutMine, { emoji, count: 1, mine: true }],
+          };
+        });
+        try {
+          localStorage.setItem(SELF_NOTES_KEY, JSON.stringify(next));
+        } catch {
+          return next;
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (!selectedId) return;
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedId}/messages/${messageId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emoji }),
+        },
+      );
+      if (!res.ok) return;
+      const updated = (await res.json()) as ChatMessageDto;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? updated : m)),
+      );
+    } catch {
+      return;
+    }
+  };
+
+  const handlePinMessage = async (messageId: string) => {
+    if (isSelfNotes) {
+      setSelfMessages((prev) => {
+        const target = prev.find((m) => m.id === messageId);
+        const shouldPin = !target?.pinnedAt;
+        const next = prev.map((m) => ({
+          ...m,
+          pinnedAt:
+            m.id === messageId && shouldPin
+              ? new Date().toISOString()
+              : null,
+        }));
+        try {
+          localStorage.setItem(SELF_NOTES_KEY, JSON.stringify(next));
+        } catch {
+          return next;
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (!selectedId) return;
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedId}/messages/${messageId}/pin`,
+        { method: "POST" },
+      );
+      if (!res.ok) return;
+      const updated = (await res.json()) as ChatMessageDto;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === messageId) return updated;
+          return updated.pinnedAt ? { ...m, pinnedAt: null } : m;
+        }),
+      );
+    } catch {
+      return;
+    }
+  };
+
   const handleForwardMessage = async (
     conversationId: string,
     message: ChatMessageDto,
@@ -568,9 +687,11 @@ export default function ConversationsPage() {
 
   return (
     <div
-      className={`min-h-dvh p-2 text-slate-900 transition-colors sm:p-4 ${vanishMode ? "bg-dot-canvas-dark" : "bg-dot-canvas"}`}
+      className={`min-h-[calc(100dvh-4rem)] p-2.5 text-slate-900 transition-colors sm:p-4 ${
+        vanishMode ? "bg-dot-canvas-dark" : "bg-dot-canvas"
+      }`}
     >
-      <div className="mx-auto flex h-[calc(100dvh-1rem)] max-w-6xl gap-4 sm:h-[calc(100dvh-2rem)]">
+      <div className="mx-auto flex h-[calc(100dvh-5.25rem)] max-w-6xl gap-4 sm:h-[calc(100dvh-6rem)]">
         <ChatSidebar
           conversations={displayConversations}
           selectedId={selectedId}
@@ -590,7 +711,7 @@ export default function ConversationsPage() {
         >
           {!selectedId ? (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400">
+              <div className="glass-chip mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl text-[#b85c7a]">
                 <svg
                   className="h-5 w-5"
                   viewBox="0 0 24 24"
@@ -601,12 +722,20 @@ export default function ConversationsPage() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-slate-900">
                 Belum ada obrolan dipilih
               </h2>
-              <p className="mt-1 max-w-xs text-xs text-slate-500">
-                Pilih percakapan di sebelah kiri untuk mulai berkirim pesan.
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
+                Pilih percakapan di sebelah kiri atau buka Catatan Pribadi untuk
+                mulai menulis.
               </p>
+              <button
+                type="button"
+                onClick={() => handleSelectChat("self-notes")}
+                className="glass-chip mt-4 rounded-lg px-3.5 py-1.5 text-xs font-semibold text-[#9e4865] transition hover:bg-white/85"
+              >
+                Buka Catatan Pribadi
+              </button>
             </div>
           ) : (
             <div className="relative flex min-w-0 flex-1 overflow-hidden">
@@ -635,6 +764,8 @@ export default function ConversationsPage() {
                 onRetrySend={handleRetrySend}
                 onEditMessage={handleEditMessage}
                 onDeleteMessage={handleDeleteMessage}
+                onReactMessage={handleReactMessage}
+                onPinMessage={handlePinMessage}
                 onForwardMessage={handleForwardMessage}
                 onBack={() => {
                   setSelectedId(null);

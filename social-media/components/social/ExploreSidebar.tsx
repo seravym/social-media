@@ -67,7 +67,7 @@ export default function ExploreSidebar() {
                 {trending.map((topic) => (
                     <li key={topic.id}>
                     <Link
-                        href={`/explore?q=${encodeURIComponent(topic.name)}`}
+                        href={`/explore/detail?type=trending&id=${encodeURIComponent(topic.id)}`}
                         className="block px-4 py-3 transition hover:bg-white/60"
                     >
                         <p className="truncate text-xs font-semibold text-slate-800">

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { resolveUserId } from "@/lib/route";
+import {
+  getModerationFilters,
+  isMutedAuthor,
+  isMutedContent,
+} from "@/lib/moderation";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -10,6 +16,7 @@ export async function GET(request: NextRequest, { params }: Context) {
   try {
     const { id } = await params;
     const currentUserId = await getSessionUserId();
+    const filters = await getModerationFilters(currentUserId);
 
     const post = await prisma.post.findUnique({
       where: { id },
@@ -20,6 +27,7 @@ export async function GET(request: NextRequest, { params }: Context) {
             name: true,
             username: true,
             avatarUrl: true,
+            settings: { select: { protectPosts: true } },
           },
         },
         comments: {
@@ -54,6 +62,33 @@ export async function GET(request: NextRequest, { params }: Context) {
       );
     }
 
+    if (post.author.settings?.protectPosts && currentUserId !== post.authorId) {
+      const isFollower = currentUserId
+        ? await prisma.follow.findUnique({
+            where: {
+              followerId_followingId: {
+                followerId: currentUserId,
+                followingId: post.authorId,
+              },
+            },
+            select: { id: true },
+          })
+        : null;
+      if (!isFollower) {
+        return NextResponse.json(
+          { error: "Postingan ini hanya dapat dilihat oleh pengikut." },
+          { status: 403 }
+        );
+      }
+    }
+
+    const visibleComments = post.comments.filter(
+      (comment) =>
+        comment.userId === currentUserId ||
+        (!isMutedAuthor(comment.user.username, filters) &&
+          !isMutedContent(comment.content, filters.words)),
+    );
+
     await prisma.post.update({
       where: { id },
       data: { views: { increment: 1 } },
@@ -78,12 +113,17 @@ export async function GET(request: NextRequest, { params }: Context) {
         content: post.content,
         views: post.views + 1,
         createdAt: post.createdAt,
-        author: post.author,
+        author: {
+          id: post.author.id,
+          name: post.author.name,
+          username: post.author.username,
+          avatarUrl: post.author.avatarUrl,
+        },
         repliesCount: post._count.comments,
         likesCount: post._count.likes,
         isLiked: Array.isArray(post.likes) && post.likes.length > 0,
         isBookmarked,
-        comments: post.comments,
+        comments: visibleComments,
       },
     });
   } catch (error) {
@@ -98,8 +138,9 @@ export async function GET(request: NextRequest, { params }: Context) {
 export async function DELETE(request: NextRequest, { params }: Context) {
   try {
     const { id } = await params;
-    const userId =
-      (await getSessionUserId()) || request.nextUrl.searchParams.get("userId");
+    const userId = await resolveUserId(
+      request.nextUrl.searchParams.get("userId")
+    );
 
     if (!userId) {
       return NextResponse.json(

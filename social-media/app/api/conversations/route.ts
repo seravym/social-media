@@ -45,11 +45,16 @@ export const GET = authed(async (user) => {
   );
 
   const items: ConversationDto[] = memberships.map((m) => {
-    const otherMember = m.conversation.members.find((x) => x.userId !== user.id);
+    const isGroup = m.conversation.type === "group";
+    const otherMember = isGroup
+      ? undefined
+      : m.conversation.members.find((x) => x.userId !== user.id);
     const lastMsg = m.conversation.messages[0];
 
     return {
       id: m.conversationId,
+      type: isGroup ? "group" : "direct",
+      name: m.conversation.name ?? null,
       other: otherMember ? toUserCard(otherMember.user) : null,
       nickname: otherMember?.nickname ?? null,
       background: m.conversation.background ?? null,
@@ -77,6 +82,90 @@ export const GET = authed(async (user) => {
 
 export const POST = authed(async (user, req) => {
   const body = await req.json().catch(() => null);
+
+  if (body?.type === "group") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > 60) {
+      return json(
+        { error: "Nama grup wajib diisi (maksimal 60 karakter)." },
+        400,
+      );
+    }
+
+    const rawMemberIds: unknown[] = Array.isArray(body.memberIds)
+      ? body.memberIds
+      : [];
+    const uniqueMemberIds: string[] = Array.from(
+      new Set<string>(
+        rawMemberIds.filter(
+          (id): id is string =>
+            typeof id === "string" && id.trim().length > 0 && id !== user.id,
+        ),
+      ),
+    );
+
+    if (uniqueMemberIds.length === 0) {
+      return json({ error: "Pilih minimal 1 anggota grup." }, 400);
+    }
+    if (uniqueMemberIds.length > 50) {
+      return json({ error: "Maksimal 50 anggota dalam satu grup." }, 400);
+    }
+
+    const [self, members] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { username: true },
+      }),
+      prisma.user.findMany({
+        where: { id: { in: uniqueMemberIds } },
+        select: { id: true, username: true },
+      }),
+    ]);
+
+    if (!self) {
+      return json({ error: "User not found" }, 404);
+    }
+    if (members.length !== uniqueMemberIds.length) {
+      return json({ error: "Sebagian anggota tidak ditemukan." }, 404);
+    }
+
+    const memberUsernames = members.map((m) => m.username.toLowerCase());
+    const block = await prisma.blockedAccount.findFirst({
+      where: {
+        OR: [
+          { userId: user.id, username: { in: memberUsernames } },
+          {
+            userId: { in: uniqueMemberIds },
+            username: self.username.toLowerCase(),
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (block) {
+      return json(
+        { error: "Tidak dapat menambahkan pengguna yang diblokir ke dalam grup." },
+        403,
+      );
+    }
+
+    const created = await prisma.conversation.create({
+      data: {
+        type: "group",
+        name,
+        members: {
+          create: [
+            { userId: user.id },
+            ...members.map((m) => ({ userId: m.id })),
+          ],
+        },
+      },
+      select: { id: true },
+    });
+
+    return json({ conversationId: created.id, existing: false }, 201);
+  }
+
   if (!body?.userId) {
     return json({ error: "userId is required" }, 400);
   }
