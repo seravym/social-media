@@ -1,37 +1,103 @@
-"use client"
+"use client";
 import "./profile.css";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
-export default function ProfilePage() {
-    const [isEditOpen, setIsEditOpen] = useState(false);
+type ProfilePost = {
+  id: string;
+  content: string;
+  views: number;
+  _count: {
+    comments: number;
+    likes: number;
+  };
+};
 
-    const [displayName, setDisplayName] = useState("Nama Akun");
-    const [username, setUsername] = useState("@username");
-    const [bio,setBio] = useState ("")
+function ProfileContent() {
+  const params = useParams<{ id: string }>();
+  const userId = params?.id;
 
-    const [draftName, setDraftName] = useState(displayName);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const [displayName, setDisplayName] = useState("Nama Akun");
+  const [username, setUsername] = useState("@username");
+  const [bio, setBio] = useState("");
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [joinedYear, setJoinedYear] = useState("2026");
+  const [posts, setPosts] = useState<ProfilePost[]>([]);
+
+  const [draftName, setDraftName] = useState(displayName);
   const [draftUsername, setDraftUsername] = useState(username);
   const [draftBio, setDraftBio] = useState(bio);
+  const [saveError, setSaveError] = useState("");
 
-    const openEditModal = () => {
-        setDraftName (displayName);
-        setDraftUsername(username);
-        setDraftBio(bio);
-        setIsEditOpen(true);
-    };
+  useEffect(() => {
+    if (!userId) return;
 
-    const handleSave = () => {
-        const cleanName = draftName.trim() || "Nama Akun";
-        const rawHandle = draftUsername.trim() || "@username";
-        const cleanHandle = rawHandle.startsWith("@") ? rawHandle : `@${rawHandle}`;  
-      
-      setDisplayName(cleanName);
-      setUsername(cleanHandle);
-      setBio(draftBio.slice(0, 35));
-      setIsEditOpen(false);
-    };
+    fetch(`/api/profile/${userId}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setDisplayName(data.name || "Nama Akun");
+        setUsername(
+          data.username?.startsWith("@")
+            ? data.username
+            : `@${data.username || "username"}`
+        );
+        setBio(data.bio || "");
+        setFollowersCount(data._count?.followers ?? 0);
+        setFollowingCount(data._count?.following ?? 0);
+        if (data.createdAt) {
+          setJoinedYear(String(new Date(data.createdAt).getFullYear()));
+        }
+        if (Array.isArray(data.posts)) {
+          setPosts(data.posts);
+        }
+      })
+      .catch(() => undefined);
+  }, [userId]);
 
-     const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const openEditModal = () => {
+    setDraftName(displayName);
+    setDraftUsername(username);
+    setDraftBio(bio);
+    setSaveError("");
+    setIsEditOpen(true);
+  };
+
+  const handleSave = async () => {
+    const cleanName = draftName.trim() || "Nama Akun";
+    const rawHandle = draftUsername.trim() || "@username";
+    const cleanHandle = rawHandle.startsWith("@") ? rawHandle : `@${rawHandle}`;
+    const cleanBio = draftBio.slice(0, 35);
+
+    if (!userId) return;
+    setSaveError("");
+
+    const res = await fetch(`/api/profile/${userId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        displayName: cleanName,
+        username: cleanHandle,
+        bio: cleanBio,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      setSaveError(err?.error || "Gagal menyimpan profil");
+      return;
+    }
+
+    setDisplayName(cleanName);
+    setUsername(cleanHandle);
+    setBio(cleanBio);
+    setIsEditOpen(false);
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const sanitized = e.target.value
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "")
@@ -39,7 +105,6 @@ export default function ProfilePage() {
 
     setDraftUsername(sanitized ? `@${sanitized}` : "");
   };
-
   return (
     <div className="profile-layout">
       <main className="profile-page">
@@ -86,7 +151,7 @@ export default function ProfilePage() {
             {bio && <p className="profile-bio">{bio}</p>}
             <p className="profile-joined">bergabung sejak 2026</p>
           </div>
-          
+
         </section>
         <section className="profile-navigation">
           <div className="active">Posts</div>
@@ -237,5 +302,14 @@ export default function ProfilePage() {
       </div>
       )}
     </div>
+  );
+}
+
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="profile-layout">Memuat profil...</div>}>
+      <ProfileContent />
+    </Suspense>
   );
 }

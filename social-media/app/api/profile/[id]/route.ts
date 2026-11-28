@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // cek import prisma di app/api/articles/route.ts kalau path-nya beda
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   _req: Request,
@@ -49,7 +49,8 @@ export async function GET(
     }
 
     return NextResponse.json(user);
-  } catch {
+  } catch (error: unknown) {
+    console.error("GET /api/profile/[id] error:", error);
     return NextResponse.json(
       { error: "Gagal mengambil data profil" },
       { status: 500 }
@@ -94,6 +95,18 @@ export async function PUT(
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
+      (error as { code?: string }).code === "P2025"
+    ) {
+      return NextResponse.json(
+        { error: "User tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
       (error as { code?: string }).code === "P2002"
     ) {
       return NextResponse.json(
@@ -102,9 +115,9 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json(
-      { error: "Gagal menyimpan profil" },
-      { status: 500 }
-    );
+    console.error("PUT /api/profile/[id] error:", error);
+    const message =
+      error instanceof Error ? error.message : "Gagal menyimpan profil";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
