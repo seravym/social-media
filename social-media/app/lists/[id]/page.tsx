@@ -7,7 +7,7 @@ import "./list-detail.css";
 
 type User = {
   id: string;
-  name: string;
+  name: string | null;
   username: string;
   avatarUrl: string | null;
 };
@@ -108,13 +108,11 @@ function ListDetailContent() {
         <h2>List Information</h2>
 
         <p>
-          Created by: {
-            list.owner?.name || `@${list.owner?.username}` || "Unknown"
-          }
-        </p>
-
-        <p>
-          @{list.owner?.username || "unknown"}
+          Created by:{" "}
+          {list.owner?.name ||
+            (list.owner?.username
+              ? `@${list.owner.username}`
+              : "Unknown")}
         </p>
 
         <p>
@@ -137,7 +135,9 @@ function ListDetailContent() {
             {list.members.map((member) => (
               <div className="member-item" key={member.id}>
                 <div>
-                  <strong>{member.user.name}</strong>
+                  <strong>
+                    {member.user.name || `@${member.user.username}`}
+                  </strong>
                   <p>@{member.user.username}</p>
                 </div>
               </div>
