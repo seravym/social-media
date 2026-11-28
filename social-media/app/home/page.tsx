@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ".home.css";
 
 interface Author {
   id: string;
@@ -123,63 +124,67 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px" }}>
-      <nav>
-        <ul style={{ display: "flex", gap: "16px", listStyle: "none", padding: 0 }}>
-          <li><Link href="/home">Home</Link></li>
-          <li><Link href="/communities">Communities</Link></li>
-          <li><Link href="/follow">Follow</Link></li>
-          <li><Link href="/notifications">Notifications</Link></li>
-          <li><Link href="/login">Login</Link></li>
-          <li><Link href="/conversations">Chat</Link></li>
+    <div className="feed-layout">
+      <nav className="feed-nav">
+        <ul className="feed-nav-list">
+          <li><Link href="/home" className="feed-nav-link active">Home</Link></li>
+          <li><Link href="/explore" className="feed-nav-link">Explore</Link></li>
+          <li><Link href="/notifications" className="feed-nav-link">Notifications</Link></li>
+          <li><Link href="/conversations" className="feed-nav-link">Messages</Link></li>
+          <li><Link href="/communities" className="feed-nav-link">Communities</Link></li>
+          <li><Link href="/bookmark" className="feed-nav-link">Bookmarks</Link></li>
+          <li><Link href="/follow" className="feed-nav-link">Follow</Link></li>
+          <li><Link href="/settings" className="feed-nav-link">Settings</Link></li>
         </ul>
       </nav>
 
-      <hr />
-
       <main>
-        <h1>Home</h1>
+        <div className="feed-header">
+          <h1 className="feed-title">Home</h1>
+        </div>
 
-        {/* Tab Navigasi */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-          <button onClick={() => handleTabChange("foryou")}>
-            For You {currentTab === "foryou" && "(Aktif)"}
+        <div className="feed-tabs">
+          <button
+            className={`feed-tab-btn ${currentTab === "foryou" ? "active" : ""}`}
+            onClick={() => handleTabChange("foryou")}
+          >
+            For You
           </button>
-          <button onClick={() => handleTabChange("following")}>
-            Following {currentTab === "following" && "(Aktif)"}
+          <button
+            className={`feed-tab-btn ${currentTab === "following" ? "active" : ""}`}
+            onClick={() => handleTabChange("following")}
+          >
+            Following
           </button>
         </div>
 
-        <hr />
-
-        {/* Form Postingan */}
-        <form onSubmit={handleCreatePost} style={{ margin: "12px 0" }}>
-          <h3>Buat Postingan Baru</h3>
+        <form onSubmit={handleCreatePost} className="composer-form">
           <textarea
+            className="composer-textarea"
             placeholder="What is happening?!"
             rows={3}
-            style={{ width: "100%" }}
             value={postText}
             onChange={(e) => setPostText(e.target.value)}
             disabled={submitting}
           />
-          <br />
-          <button type="submit" disabled={submitting || !postText.trim()}>
-            {submitting ? "Mengirim..." : "Post"}
-          </button>
+          <div className="composer-actions">
+            <button
+              type="submit"
+              className="btn-pink"
+              disabled={submitting || !postText.trim()}
+            >
+              {submitting ? "Mengirim..." : "Post"}
+            </button>
+          </div>
         </form>
 
-        {errorMsg && <p style={{ color: "red" }}>{errorMsg}</p>}
+        {errorMsg && <p className="error-text">{errorMsg}</p>}
 
-        <hr />
-
-        {/* Feed Postingan */}
         <div>
-          <h3>Linimasa (Feed)</h3>
           {loading ? (
-            <p>Memuat postingan...</p>
+            <p className="status-text">Memuat postingan...</p>
           ) : posts.length === 0 ? (
-            <p>
+            <p className="status-text">
               {currentTab === "following"
                 ? "Belum ada postingan dari akun yang kamu ikuti."
                 : "Belum ada postingan."}
@@ -188,26 +193,28 @@ export default function HomePage() {
             posts.map((post) => (
               <div
                 key={post.id}
+                className="post-card"
                 onClick={() => router.push(`/post/${post.id}`)}
-                style={{
-                  border: "1px solid gray",
-                  margin: "10px 0",
-                  padding: "12px",
-                  cursor: "pointer",
-                }}
               >
-                <p>
-                  <strong>{post.author.name || post.author.username}</strong>{" "}
-                  @{post.author.username} ·{" "}
-                  {new Date(post.createdAt).toLocaleString("id-ID")}
-                </p>
-                <p>{post.content}</p>
-                <div>
-                  <span>💬 {post.repliesCount}</span> |{" "}
-                  <button onClick={(e) => handleToggleLike(e, post.id)}>
-                    {post.isLiked ? "❤️" : "🤍"} ({post.likesCount})
-                  </button>{" "}
-                  | <span>📊 {post.views}</span>
+                <div className="post-meta">
+                  <span className="post-author-name">
+                    {post.author.name || post.author.username}
+                  </span>
+                  <span className="post-author-handle">@{post.author.username}</span>
+                  <span className="post-time">
+                    · {new Date(post.createdAt).toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <p className="post-content">{post.content}</p>
+                <div className="post-actions">
+                  <span>💬 {post.repliesCount}</span>
+                  <button
+                    className={`action-btn ${post.isLiked ? "liked" : ""}`}
+                    onClick={(e) => handleToggleLike(e, post.id)}
+                  >
+                    {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
+                  </button>
+                  <span>📊 {post.views}</span>
                 </div>
               </div>
             ))

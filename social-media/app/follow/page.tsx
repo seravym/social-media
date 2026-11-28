@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import "../home/home.css";
 
 interface UserItem {
   id: string;
@@ -77,43 +78,39 @@ export default function FollowPage() {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px" }}>
-      <nav>
-        <Link href="/home">← Kembali ke Home</Link>
+    <div className="feed-layout">
+      <nav className="feed-nav">
+        <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
       </nav>
 
-      <hr />
+      <div className="feed-header">
+        <h1 className="feed-title">Who to Follow</h1>
+      </div>
 
-      <h1>Who to Follow</h1>
-
-      {errorMsg && <p style={{ color: "red" }}>{errorMsg}</p>}
+      {errorMsg && <p className="error-text">{errorMsg}</p>}
 
       {loading ? (
-        <p>Memuat pengguna...</p>
+        <p className="status-text">Memuat pengguna...</p>
       ) : users.length === 0 ? (
-        <p>Belum ada pengguna lain yang terdaftar.</p>
+        <p className="status-text">Belum ada pengguna lain yang terdaftar.</p>
       ) : (
         users.map((user) => (
-          <div
-            key={user.id}
-            style={{
-              border: "1px solid gray",
-              padding: "12px",
-              margin: "10px 0",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
+          <div key={user.id} className="follow-card">
             <div>
-              <p style={{ margin: 0 }}>
-                <strong>{user.name || user.username}</strong> @{user.username}
-              </p>
-              <p style={{ margin: 0, fontSize: "0.85rem", color: "gray" }}>
+              <div className="post-meta" style={{ marginBottom: "2px" }}>
+                <span className="post-author-name">
+                  {user.name || user.username}
+                </span>
+                <span className="post-author-handle">@{user.username}</span>
+              </div>
+              <p className="post-time" style={{ margin: 0 }}>
                 {user.followersCount} Followers · {user.followingCount} Following
               </p>
             </div>
-            <button onClick={() => handleToggleFollow(user.id)}>
+            <button
+              className={user.isFollowing ? "btn-outline" : "btn-pink"}
+              onClick={() => handleToggleFollow(user.id)}
+            >
               {user.isFollowing ? "Following" : "Follow"}
             </button>
           </div>
