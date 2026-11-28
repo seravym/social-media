@@ -62,17 +62,51 @@
   font-weight: 650;
 }
 
+/* SEARCH BUTTON */
+
+.navbar-search-link {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: #687386;
+  text-decoration: none;
+  transition: 0.2s ease;
+}
+
+.navbar-search-link:hover {
+  color: #d94691;
+  background: #fff0f6;
+}
+
+.navbar-search-link.active {
+  color: #d94691;
+  background: #fff0f6;
+}
+
+/* MOBILE X BUTTON */
+
 .navbar-menu-button {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: none;
-  border-radius: 10px;
-  background: #fff0f6;
-  color: #d94691;
+  background: transparent;
+  color: #242b38;
   cursor: pointer;
+}
+
+.navbar-x-logo {
+  font-family: Georgia, serif;
+  font-size: 43px;
+  font-weight: bold;
+  line-height: 1;
 }
 
 /* MOBILE SIDEBAR */
@@ -108,13 +142,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border: none;
   border-radius: 10px;
   background: #f7f8fb;
   color: #687386;
   cursor: pointer;
+}
+
+.sidebar-close-button:hover {
+  background: #fff0f6;
+  color: #d94691;
 }
 
 .sidebar-links {
@@ -147,6 +186,8 @@
   color: #d94691;
   font-weight: 650;
 }
+
+/* ANIMATIONS */
 
 @keyframes navbarFadeIn {
   from {
@@ -194,42 +235,26 @@
 
 @media (max-width: 850px) {
   .app-navbar {
-    height: 64px;
+    height: 72px;
   }
 
   .navbar-inner {
     padding: 0 20px;
+    gap: 12px;
   }
 
+  .navbar-brand,
   .navbar-links {
     display: none;
   }
 
   .navbar-menu-button {
     display: flex;
+    order: 1;
   }
-}
 
-
-.navbar-search-link {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 10px;
-  color: #687386;
-  text-decoration: none;
-  transition: 0.2s ease;
-}
-
-.navbar-search-link:hover {
-  color: #d94691;
-  background: #fff0f6;
-}
-
-.navbar-search-link.active {
-  color: #d94691;
-  background: #fff0f6;
+  .navbar-search-link {
+    order: 2;
+    margin-left: auto;
+  }
 }

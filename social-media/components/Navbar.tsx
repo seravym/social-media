@@ -15,7 +15,6 @@ import {
   UserRound,
   Settings,
   Search,
-  Menu,
   X,
 } from "lucide-react";
 import "./Navbar.css";
@@ -40,6 +39,9 @@ export default function Navbar() {
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
 
+  const isExploreActive =
+    pathname === "/explore" || pathname.startsWith("/explore/");
+
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
 
@@ -50,17 +52,31 @@ export default function Navbar() {
 
   if (isAuthPage) return null;
 
-  const isExploreActive =
-    pathname === "/explore" || pathname.startsWith("/explore/");
+  const sidebarItems = navItems.filter(
+    (item) => item.href !== "/profile"
+  );
 
   return (
     <>
       <header className="app-navbar">
         <div className="navbar-inner">
+          {/* MOBILE X BUTTON */}
+          <button
+            type="button"
+            className="navbar-menu-button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={menuOpen}
+          >
+            <span className="navbar-x-logo">𝕏</span>
+          </button>
+
+          {/* DESKTOP BRAND */}
           <Link href="/home" className="navbar-brand">
             Social
           </Link>
 
+          {/* DESKTOP NAVIGATION */}
           <nav className="navbar-links">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -81,27 +97,21 @@ export default function Navbar() {
             })}
           </nav>
 
+          {/* SEARCH BUTTON */}
           <Link
             href="/explore"
-            className={`navbar-search-link ${isExploreActive ? "active" : ""}`}
+            className={`navbar-search-link ${
+              isExploreActive ? "active" : ""
+            }`}
             aria-label="Jelajahi"
             title="Jelajahi"
           >
-            <Search size={20} strokeWidth={2} />
+            <Search size={23} strokeWidth={2} />
           </Link>
-
-          <button
-            type="button"
-            className="navbar-menu-button"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open navigation menu"
-            aria-expanded={menuOpen}
-          >
-            <Menu size={24} />
-          </button>
         </div>
       </header>
 
+      {/* MOBILE SIDEBAR */}
       {menuOpen && (
         <div
           className="navbar-overlay"
@@ -126,22 +136,40 @@ export default function Navbar() {
                 onClick={() => setMenuOpen(false)}
                 aria-label="Close navigation menu"
               >
-                <X size={23} />
+                <X size={25} />
               </button>
             </div>
 
             <nav className="sidebar-links">
+              {/* PROFILE AT THE TOP */}
+              <Link
+                href="/profile"
+                className={`sidebar-link ${
+                  pathname === "/profile" ||
+                  pathname.startsWith("/profile/")
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() => setMenuOpen(false)}
+              >
+                <UserRound size={20} strokeWidth={1.9} />
+                <span>Profil</span>
+              </Link>
+
+              {/* EXPLORE */}
               <Link
                 href="/explore"
-                className={`sidebar-link ${isExploreActive ? "active" : ""}`}
+                className={`sidebar-link ${
+                  isExploreActive ? "active" : ""
+                }`}
                 onClick={() => setMenuOpen(false)}
-                aria-label="Jelajahi"
               >
                 <Search size={20} strokeWidth={1.9} />
                 <span>Jelajahi</span>
               </Link>
 
-              {navItems.map((item) => {
+              {/* OTHER NAVIGATION ITEMS */}
+              {sidebarItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =
                   pathname === item.href ||
@@ -151,7 +179,9 @@ export default function Navbar() {
                   <Link
                     href={item.href}
                     key={item.href}
-                    className={`sidebar-link ${isActive ? "active" : ""}`}
+                    className={`sidebar-link ${
+                      isActive ? "active" : ""
+                    }`}
                     onClick={() => setMenuOpen(false)}
                   >
                     <Icon size={20} strokeWidth={1.9} />
