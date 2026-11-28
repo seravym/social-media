@@ -200,6 +200,8 @@ model Article {
   authorId      String
   title         String
   content       String
+  category      String            @default("Technology")
+  views         Int               @default(0)
   coverImageUrl String?
   status        String            @default("published")
   createdAt     DateTime          @default(now())
