@@ -427,9 +427,16 @@ export default function ExplorePage() {
                 <ul className="space-y-4">
                     {shownNews.map((n) => (
                     <li key={n.id} className="border-b border-gray-100 pb-3">
-                        <p className="text-base font-bold">
-                        <Highlight text={n.title} query={query} />
-                        </p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedNews(n);
+                                setSelectedTrend(null);
+                            }}
+                            className="text-left text-base font-bold transition hover:text-[#b85c7a]"
+                        >
+                            <Highlight text={n.title} query={query} />
+                        </button>
                         <p className="mt-1 text-sm text-gray-500">
                         {timeAgo(n.createdAt)} · {n.category} · {formatCount(n.postCount)}
                         </p>
