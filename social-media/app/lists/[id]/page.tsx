@@ -33,6 +33,13 @@ type ListDetail = {
   };
 };
 
+type Comment = {
+  id: string;
+  content: string;
+  createdAt: string;
+  user: User;
+};
+
 type Post = {
   id: string;
   content: string;
@@ -56,7 +63,27 @@ function ListDetailContent() {
   const [postsLoading, setPostsLoading] = useState(true);
   const [error, setError] = useState("");
   const [postsError, setPostsError] = useState("");
+
   const [likingPostIds, setLikingPostIds] = useState<Set<string>>(
+    new Set()
+  );
+
+  const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [commentsByPost, setCommentsByPost] = useState<
+    Record<string, Comment[]>
+  >({});
+  const [loadedCommentPostIds, setLoadedCommentPostIds] = useState<
+    Set<string>
+  >(new Set());
+  const [loadingCommentPostIds, setLoadingCommentPostIds] = useState<
+    Set<string>
+  >(new Set());
+  const [commentInputs, setCommentInputs] = useState<
+    Record<string, string>
+  >({});
+  const [submittingPostIds, setSubmittingPostIds] = useState<Set<string>>(
     new Set()
   );
 
@@ -149,6 +176,145 @@ function ListDetailContent() {
       setLikingPostIds((previous) => {
         const updated = new Set(previous);
         updated.delete(post.id);
+        return updated;
+      });
+    }
+  }
+
+  async function handleToggleReplies(postId: string) {
+    const isExpanded = expandedPostIds.has(postId);
+
+    setExpandedPostIds((previous) => {
+      const updated = new Set(previous);
+
+      if (isExpanded) {
+        updated.delete(postId);
+      } else {
+        updated.add(postId);
+      }
+
+      return updated;
+    });
+
+    if (isExpanded || loadedCommentPostIds.has(postId)) return;
+
+    setLoadingCommentPostIds((previous) => {
+      const updated = new Set(previous);
+      updated.add(postId);
+      return updated;
+    });
+
+    try {
+      const response = await fetch(
+        `/api/posts/${postId}/comments`
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load replies.");
+      }
+
+      setCommentsByPost((previous) => ({
+        ...previous,
+        [postId]: result.comments || [],
+      }));
+
+      setLoadedCommentPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.add(postId);
+        return updated;
+      });
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to load replies."
+      );
+
+      setExpandedPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.delete(postId);
+        return updated;
+      });
+    } finally {
+      setLoadingCommentPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.delete(postId);
+        return updated;
+      });
+    }
+  }
+
+  async function handleSubmitComment(postId: string) {
+    const content = commentInputs[postId]?.trim();
+
+    if (!content || submittingPostIds.has(postId)) return;
+
+    setSubmittingPostIds((previous) => {
+      const updated = new Set(previous);
+      updated.add(postId);
+      return updated;
+    });
+
+    try {
+      const response = await fetch(
+        `/api/posts/${postId}/comments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send reply.");
+      }
+
+      const newComment: Comment = result.comment;
+
+      setCommentsByPost((previous) => ({
+        ...previous,
+        [postId]: [
+          newComment,
+          ...(previous[postId] || []),
+        ],
+      }));
+
+      setCommentInputs((previous) => ({
+        ...previous,
+        [postId]: "",
+      }));
+
+      setLoadedCommentPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.add(postId);
+        return updated;
+      });
+
+      setPosts((previous) =>
+        previous.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                repliesCount: post.repliesCount + 1,
+              }
+            : post
+        )
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to send reply."
+      );
+    } finally {
+      setSubmittingPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.delete(postId);
         return updated;
       });
     }
@@ -302,11 +468,16 @@ function ListDetailContent() {
                 <p className="list-post-content">{post.content}</p>
 
                 <div className="list-post-stats">
-                  <span>
-                    💬{" "}
-                    {post.repliesCount}{" "}
+                  <button
+                    type="button"
+                    className={`list-replies-button ${
+                      expandedPostIds.has(post.id) ? "active" : ""
+                    }`}
+                    onClick={() => handleToggleReplies(post.id)}
+                  >
+                    💬 {post.repliesCount}{" "}
                     {post.repliesCount === 1 ? "Reply" : "Replies"}
-                  </span>
+                  </button>
 
                   <button
                     type="button"
@@ -323,6 +494,110 @@ function ListDetailContent() {
 
                   <span>👁️ {post.views} Views</span>
                 </div>
+
+                {expandedPostIds.has(post.id) && (
+                  <div className="list-replies-section">
+                    <h3>Replies</h3>
+
+                    {loadingCommentPostIds.has(post.id) ? (
+                      <p className="replies-message">
+                        Loading replies...
+                      </p>
+                    ) : (
+                      <>
+                        {(commentsByPost[post.id] || []).length === 0 ? (
+                          <p className="replies-message">
+                            No replies yet. Be the first to reply!
+                          </p>
+                        ) : (
+                          <div className="list-comments">
+                            {(commentsByPost[post.id] || []).map(
+                              (comment) => (
+                                <div
+                                  className="list-comment-item"
+                                  key={comment.id}
+                                >
+                                  <div className="list-comment-avatar">
+                                    {comment.user.avatarUrl ? (
+                                      <img
+                                        src={comment.user.avatarUrl}
+                                        alt={comment.user.username}
+                                      />
+                                    ) : (
+                                      <span>
+                                        {(
+                                          comment.user.name ||
+                                          comment.user.username
+                                        )
+                                          .charAt(0)
+                                          .toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="list-comment-content">
+                                    <div className="list-comment-heading">
+                                      <strong>
+                                        {comment.user.name ||
+                                          `@${comment.user.username}`}
+                                      </strong>
+                                      <span>
+                                        @{comment.user.username}
+                                      </span>
+                                    </div>
+
+                                    <p>{comment.content}</p>
+
+                                    <small>
+                                      {new Date(
+                                        comment.createdAt
+                                      ).toLocaleString("id-ID", {
+                                        dateStyle: "medium",
+                                        timeStyle: "short",
+                                      })}
+                                    </small>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+
+                        <form
+                          className="list-reply-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            handleSubmitComment(post.id);
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="Write a reply..."
+                            value={commentInputs[post.id] || ""}
+                            onChange={(event) =>
+                              setCommentInputs((previous) => ({
+                                ...previous,
+                                [post.id]: event.target.value,
+                              }))
+                            }
+                          />
+
+                          <button
+                            type="submit"
+                            disabled={
+                              !commentInputs[post.id]?.trim() ||
+                              submittingPostIds.has(post.id)
+                            }
+                          >
+                            {submittingPostIds.has(post.id)
+                              ? "Sending..."
+                              : "Send"}
+                          </button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                )}
               </article>
             ))}
           </div>
