@@ -16,7 +16,17 @@ type Post = {
     views: number;
     createdAt: string;
     author: Account;
+    _count: {
+        comments: number;
+        likes: number;
+    };
 };
+
+type ExploreComment = {
+    id: string;
+    content: string;
+};
+
 type HistoryItem = { id: string; query: string };
 
 const TABS = ["Explore", "Trending", "News", "Sports", "Entertainment"] as const;
@@ -69,6 +79,11 @@ export default function ExplorePage() {
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
+    const [commentOpen, setCommentOpen] = useState<Record<string, boolean>>({});
+    const [commentText, setCommentText] = useState<Record<string, string>>({});
+    const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({});
+    const [newComments, setNewComments] = useState<Record<string, ExploreComment[]>>({});
+    const [likeLoading, setLikeLoading] = useState<Record<string, boolean>>({});
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [following, setFollowing] = useState<Record<string, boolean>>({});
     const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
@@ -205,6 +220,115 @@ export default function ExplorePage() {
     const allPosts = tab === "Trending" ? [] : (byCategory(posts ?? []) ?? []);
     const shownPosts = compact ? allPosts.slice(0, 5) : allPosts;
     const showAccounts = (tab === "Explore" || searching) && accounts.length > 0;
+
+    const handleLikePost = async (postId: string) => {
+        if (likeLoading[postId]) return;
+
+        setLikeLoading((prev) => ({
+            ...prev,
+            [postId]: true,
+        }));
+
+        try {
+            const res = await fetch(`/api/posts/${postId}/like`, {
+                method: "POST",
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Gagal memproses like");
+                return;
+            }
+
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            _count: {
+                                ...post._count,
+                                likes: data.liked
+                                    ? post._count.likes + 1
+                                    : Math.max(0, post._count.likes - 1),
+                            },
+                        }
+                        : post
+                )
+            );
+        } catch {
+            alert("Terjadi kesalahan saat memproses like");
+        } finally {
+            setLikeLoading((prev) => ({
+                ...prev,
+                [postId]: false,
+            }));
+        }
+    };
+
+    const handleAddComment = async (postId: string) => {
+        const content = commentText[postId]?.trim();
+
+        if (!content || commentLoading[postId]) return;
+
+        setCommentLoading((prev) => ({
+            ...prev,
+            [postId]: true,
+        }));
+
+        try {
+            const res = await fetch(`/api/posts/${postId}/comments`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ content }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Gagal mengirim komentar");
+                return;
+            }
+
+            const comment: ExploreComment = {
+                id: data.comment?.id ?? `${postId}-${Date.now()}`,
+                content: data.comment?.content ?? content,
+            };
+
+            setNewComments((prev) => ({
+                ...prev,
+                [postId]: [comment, ...(prev[postId] ?? [])],
+            }));
+
+            setPosts((prev) =>
+                prev.map((post) =>
+                    post.id === postId
+                        ? {
+                            ...post,
+                            _count: {
+                                ...post._count,
+                                comments: post._count.comments + 1,
+                            },
+                        }
+                        : post
+                )
+            );
+
+            setCommentText((prev) => ({
+                ...prev,
+                [postId]: "",
+            }));
+        } catch {
+            alert("Terjadi kesalahan saat mengirim komentar");
+        } finally {
+            setCommentLoading((prev) => ({
+                ...prev,
+                [postId]: false,
+            }));
+        }
+    };
 
     const nothing =
         !loading &&
@@ -344,12 +468,18 @@ export default function ExplorePage() {
                     <li key={a.id} className="flex items-center gap-3 border-b border-gray-100 pb-3">
                         <Avatar name={a.name ?? a.username} />
                         <div className="min-w-0 flex-1">
-                            <p className="text-base font-bold">
+                            <Link
+                                href={`/profile/${a.id}`}
+                                className="text-base font-bold transition hover:text-[#b85c7a]"
+                            >
                                 <Highlight text={a.name ?? a.username} query={query} />
-                            </p>
-                            <p className="text-sm text-gray-500">
+                            </Link>
+                            <Link
+                                href={`/profile/${a.id}`}
+                                className="block text-sm text-gray-500 hover:text-[#b85c7a]"
+                            >
                                 @<Highlight text={a.username} query={query} />
-                            </p>
+                            </Link>
                         </div>
                         <button
                             type="button"
@@ -381,20 +511,96 @@ export default function ExplorePage() {
                         <Avatar name={p.author.name ?? p.author.username} />
                         <div className="min-w-0">
                         <p className="text-sm text-gray-500">
-                            <span className="text-base font-bold text-gray-900">
-                            <Highlight text={p.author.name ?? p.author.username} query={query} />
-                            </span>{" "}
+                            <Link
+                                href={`/profile/${p.author.id}`}
+                                className="text-base font-bold text-gray-900 hover:text-[#b85c7a]"
+                            >
+                                <Highlight text={p.author.name ?? p.author.username} query={query} />
+                            </Link>{" "}
                             @{p.author.username} · {timeAgo(p.createdAt)} ·{" "}
                             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">
                             {p.category}
                             </span>
                         </p>
-                        <p className="mt-1 text-base">
+                        <Link
+                            href={`/post/${p.id}?from=explore`}
+                            className="mt-1 block text-base hover:text-[#b85c7a]"
+                        >
                             <Highlight text={p.content} query={query} />
-                        </p>
-                        <p className="mt-2 text-sm text-gray-500">
-                            💬 {p.replyCount} · ♡ {p.likeCount} · 📊 {p.views}
-                        </p>
+                        </Link>
+                            <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCommentOpen((prev) => ({
+                                            ...prev,
+                                            [p.id]: !prev[p.id],
+                                        }))
+                                    }
+                                    className="transition hover:text-[#b85c7a]"
+                                >
+                                    💬 {p._count.comments}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleLikePost(p.id)}
+                                    disabled={!!likeLoading[p.id]}
+                                    className="transition hover:text-[#b85c7a] disabled:opacity-50"
+                                >
+                                    {likeLoading[p.id] ? "Memproses..." : `♡ ${p._count.likes}`}
+                                </button>
+
+                                <span>📊 {p.views}</span>
+                            </div>
+
+                            {commentOpen[p.id] && (
+                                <div className="mt-3 space-y-3">
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            handleAddComment(p.id);
+                                        }}
+                                        className="space-y-2"
+                                    >
+                                        <textarea
+                                            value={commentText[p.id] ?? ""}
+                                            onChange={(e) =>
+                                                setCommentText((prev) => ({
+                                                    ...prev,
+                                                    [p.id]: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="Tulis komentar..."
+                                            rows={2}
+                                            disabled={!!commentLoading[p.id]}
+                                            className="w-full resize-none rounded-xl border border-gray-200 bg-white/80 p-3 text-sm outline-none focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-100"
+                                        />
+
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="submit"
+                                                disabled={
+                                                    !!commentLoading[p.id] ||
+                                                    !(commentText[p.id] ?? "").trim()
+                                                }
+                                                className="rounded-full bg-[#b85c7a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9e4865] disabled:opacity-50"
+                                            >
+                                                {commentLoading[p.id] ? "Mengirim..." : "Reply"}
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    {(newComments[p.id] ?? []).map((comment) => (
+                                        <div
+                                            key={comment.id}
+                                            className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                                        >
+                                            {comment.content}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </li>
                     ))}
