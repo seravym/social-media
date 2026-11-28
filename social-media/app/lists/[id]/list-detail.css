@@ -306,3 +306,28 @@
   }
 }
 
+
+.list-like-button {
+  border: none;
+  background: transparent;
+  color: #999;
+  font: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: 0.2s;
+}
+
+.list-like-button:hover {
+  color: #e84b9b;
+}
+
+.list-like-button.liked {
+  color: #e84b9b;
+}
+
+.list-like-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+

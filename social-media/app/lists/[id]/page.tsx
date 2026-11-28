@@ -56,6 +56,9 @@ function ListDetailContent() {
   const [postsLoading, setPostsLoading] = useState(true);
   const [error, setError] = useState("");
   const [postsError, setPostsError] = useState("");
+  const [likingPostIds, setLikingPostIds] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     async function fetchData() {
@@ -97,6 +100,59 @@ function ListDetailContent() {
       fetchData();
     }
   }, [id]);
+
+  async function handleLike(post: Post) {
+    if (likingPostIds.has(post.id)) return;
+
+    setLikingPostIds((previous) => {
+      const updated = new Set(previous);
+      updated.add(post.id);
+      return updated;
+    });
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/like`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to process like.");
+      }
+
+      setPosts((previous) =>
+        previous.map((item) =>
+          item.id === post.id
+            ? {
+                ...item,
+                isLiked: result.liked,
+                likesCount: Math.max(
+                  0,
+                  item.likesCount + (result.liked ? 1 : -1)
+                ),
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Like Error:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to process like."
+      );
+    } finally {
+      setLikingPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.delete(post.id);
+        return updated;
+      });
+    }
+  }
 
   if (loading) {
     return (
@@ -232,6 +288,7 @@ function ListDetailContent() {
                     <strong>
                       {post.author.name || `@${post.author.username}`}
                     </strong>
+
                     <span>
                       @{post.author.username} ·{" "}
                       {new Date(post.createdAt).toLocaleString("id-ID", {
@@ -245,10 +302,25 @@ function ListDetailContent() {
                 <p className="list-post-content">{post.content}</p>
 
                 <div className="list-post-stats">
-                  <span>💬 {post.repliesCount} Replies</span>
                   <span>
-                    {post.isLiked ? "❤️" : "♡"} {post.likesCount} Likes
+                    💬{" "}
+                    {post.repliesCount}{" "}
+                    {post.repliesCount === 1 ? "Reply" : "Replies"}
                   </span>
+
+                  <button
+                    type="button"
+                    className={`list-like-button ${
+                      post.isLiked ? "liked" : ""
+                    }`}
+                    onClick={() => handleLike(post)}
+                    disabled={likingPostIds.has(post.id)}
+                  >
+                    {post.isLiked ? "❤️" : "♡"}{" "}
+                    {post.likesCount}{" "}
+                    {post.likesCount === 1 ? "Like" : "Likes"}
+                  </button>
+
                   <span>👁️ {post.views} Views</span>
                 </div>
               </article>
