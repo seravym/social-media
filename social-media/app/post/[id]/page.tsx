@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { MessageCircle, Heart, BarChart2, Bookmark, Trash2 } from "lucide-react";
 import "../../home/home.css";
 
 
@@ -206,25 +207,39 @@ function PostDetailContent() {
           <span className="post-author-handle">@{post.author.username}</span>
         </div>
         <p className="post-content" style={{ fontSize: "1.1rem" }}>{post.content}</p>
-        <p className="post-time" style={{ marginBottom: "12px" }}>
-          {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views}
+        <p className="post-time" style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+          <span>{new Date(post.createdAt).toLocaleString("id-ID")} ·</span>
+          <BarChart2 size={15} strokeWidth={1.9} />
+          <span>{post.views} Views</span>
         </p>
         <div className="post-actions">
-          <span>💬 {post.repliesCount}</span>
+          <span className="action-stat">
+            <MessageCircle size={16} strokeWidth={1.9} /> {post.repliesCount}
+          </span>
           <button
             className={`action-btn ${post.isLiked ? "liked" : ""}`}
             onClick={handleToggleLike}
           >
-            {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
+            <Heart
+              size={16}
+              strokeWidth={1.9}
+              fill={post.isLiked ? "currentColor" : "none"}
+            />{" "}
+            {post.likesCount}
           </button>
           <button className="action-btn danger" onClick={handleDeletePost}>
-            🗑️ Delete
+            <Trash2 size={16} strokeWidth={1.9} /> Delete
           </button>
           <button
             className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
             onClick={handleToggleBookmark}
           >
-            {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
+            <Bookmark
+              size={16}
+              strokeWidth={1.9}
+              fill={post.isBookmarked ? "currentColor" : "none"}
+            />
+            {post.isBookmarked ? "Saved" : "Save"}
           </button>
         </div>
       </article>

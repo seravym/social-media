@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { MessageCircle, Heart, BarChart2, Bookmark } from "lucide-react";
 import "./home.css";
 
 interface Author {
@@ -217,19 +218,33 @@ export default function HomePage() {
                 </div>
                 <p className="post-content">{post.content}</p>
                 <div className="post-actions">
-                  <span>💬 {post.repliesCount}</span>
+                  <span className="action-stat">
+                    <MessageCircle size={16} strokeWidth={1.9} /> {post.repliesCount}
+                  </span>
                   <button
                     className={`action-btn ${post.isLiked ? "liked" : ""}`}
                     onClick={(e) => handleToggleLike(e, post.id)}
                   >
-                    {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
+                    <Heart
+                      size={16}
+                      strokeWidth={1.9}
+                      fill={post.isLiked ? "currentColor" : "none"}
+                    />{" "}
+                    {post.likesCount}
                   </button>
-                  <span>📊 {post.views}</span>
+                  <span className="action-stat">
+                    <BarChart2 size={16} strokeWidth={1.9} /> {post.views}
+                  </span>
                   <button
                     className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
                     onClick={(e) => handleToggleBookmark(e, post.id)}
                   >
-                    {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
+                    <Bookmark
+                      size={16}
+                      strokeWidth={1.9}
+                      fill={post.isBookmarked ? "currentColor" : "none"}
+                    />
+                    {post.isBookmarked ? "Saved" : "Save"}
                   </button>
                 </div>
               </div>

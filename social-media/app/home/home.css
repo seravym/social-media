@@ -158,7 +158,6 @@
   background-color: var(--accent-soft);
 }
 
-/* Kartu Postingan */
 .post-card {
   padding: 16px;
   border-bottom: 1px solid var(--border);
@@ -230,6 +229,13 @@
 .action-btn.liked {
   color: var(--accent);
   font-weight: 600;
+}
+
+.action-stat,
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .action-btn.danger:hover {
