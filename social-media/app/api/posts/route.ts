@@ -122,8 +122,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Jika post dibuat di dalam community,
-    // pastikan community tersedia dan user sudah bergabung.
     if (communityId !== null) {
       if (
         !Number.isInteger(communityId) ||

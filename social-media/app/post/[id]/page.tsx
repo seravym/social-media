@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import "../../home/home.css";
@@ -43,16 +43,16 @@ function PostDetailContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const hasFetchedId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!postId) return;
-    let cancelled = false;
+    if (!postId || hasFetchedId.current === postId) return;
+    hasFetchedId.current = postId;
 
     async function loadPostDetail() {
       try {
         const res = await fetch(`/api/posts/${postId}`);
         const data = await res.json();
-        if (cancelled) return;
 
         if (!res.ok) {
           setErrorMsg(data.error || "Postingan tidak ditemukan");
@@ -60,16 +60,13 @@ function PostDetailContent() {
           setPost(data.post);
         }
       } catch {
-        if (!cancelled) setErrorMsg("Gagal memuat detail postingan");
+        setErrorMsg("Gagal memuat detail postingan");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
 
     loadPostDetail();
-    return () => {
-      cancelled = true;
-    };
   }, [postId]);
 
   const handleToggleLike = async () => {
@@ -192,7 +189,7 @@ function PostDetailContent() {
         </div>
         <p className="post-content" style={{ fontSize: "1.1rem" }}>{post.content}</p>
         <p className="post-time" style={{ marginBottom: "12px" }}>
-          {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views} Views
+          {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views}
         </p>
         <div className="post-actions">
           <span>💬 {post.repliesCount}</span>
