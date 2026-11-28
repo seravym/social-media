@@ -327,7 +327,7 @@ export default function ExplorePage() {
 
     const section = (title: string, children: React.ReactNode) => (
         <section className="mb-8">
-        <h2 className="mb-3 text-xl font-bold text-slate-900">{title}</h2>
+        <h2 className="mb-3 text-lg font-bold text-slate-900 sm:text-xl">{title}</h2>
         {children}
         </section>
     );
@@ -335,12 +335,12 @@ export default function ExplorePage() {
     return (
     <div className="bg-dot-canvas min-h-dvh text-slate-900">
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-    <main className="glass-panel overflow-hidden rounded-2xl p-5">
-        <div className="relative mb-4 flex items-center gap-4">
+    <main className="glass-panel min-w-0 overflow-hidden rounded-2xl p-3 sm:p-5">
+        <div className="relative mb-4 flex min-w-0 items-center gap-2 sm:gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
             </Link>
-            <div className="relative w-full">
+            <div className="relative min-w-0 flex-1">
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -387,12 +387,12 @@ export default function ExplorePage() {
             </div>
         </div>
 
-        <div className="mb-6 flex border-b border-gray-200">
+        <div className="mb-6 flex overflow-x-auto border-b border-gray-200">
             {TABS.map((t) => (
             <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 pb-3 text-base font-semibold transition ${
+                className={`flex-none whitespace-nowrap px-3 pb-3 text-sm font-semibold transition sm:flex-1 sm:px-0 sm:text-base ${
                 tab === t
                     ? "border-b-2 border-[#b85c7a] text-[#b85c7a]"
                     : "text-gray-500 hover:text-[#b85c7a]"
@@ -430,9 +430,9 @@ export default function ExplorePage() {
                 "Trending",
                 <ol className="space-y-4">
                     {shownTrending.map((t, i) => (
-                    <li key={t.id} className="flex gap-4 border-b border-gray-100 pb-3">
+                    <li key={t.id} className="flex min-w-0 gap-2 border-b border-gray-100 pb-3 sm:gap-4">
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
-                        <div>
+                        <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
                         <Link
                             href={`/explore/detail?type=trending&id=${encodeURIComponent(t.id)}`}
@@ -492,9 +492,9 @@ export default function ExplorePage() {
                 "Postingan populer",
                 <ul className="space-y-4">
                     {shownPosts.map((p) => (
-                    <li key={p.id} className="flex gap-3 border-b border-gray-100 pb-4">
+                    <li key={p.id} className="flex min-w-0 gap-2 border-b border-gray-100 pb-4 sm:gap-3">
                         <Avatar name={p.author.name ?? p.author.username} />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-500">
                             <Link
                                 href={`/profile/${p.author.id}`}
