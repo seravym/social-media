@@ -30,7 +30,8 @@ export default function VerifyForm() {
       return;
     }
 
-    router.push("/");
+    router.push("/home");
+    router.refresh();
   }
 
   return (
