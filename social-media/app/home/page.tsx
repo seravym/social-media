@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { MessageCircle, Heart, BarChart2, Bookmark } from "lucide-react";
 import "./home.css";
 
 interface Author {
@@ -146,97 +147,113 @@ export default function HomePage() {
 };
 
   return (
-    <div className="feed-layout">
+    <div className="min-h-screen bg-dot-canvas px-4 py-6">
+      <div className="feed-layout">
 
-      <main>
-        <div className="feed-header">
-          <h1 className="feed-title">Home</h1>
-        </div>
+        <main>
+          <div className="feed-header">
+            <h1 className="feed-title">Home</h1>
+          </div>
 
-        <div className="feed-tabs">
-          <button
-            className={`feed-tab-btn ${currentTab === "foryou" ? "active" : ""}`}
-            onClick={() => handleTabChange("foryou")}
-          >
-            For You
-          </button>
-          <button
-            className={`feed-tab-btn ${currentTab === "following" ? "active" : ""}`}
-            onClick={() => handleTabChange("following")}
-          >
-            Following
-          </button>
-        </div>
-
-        <form onSubmit={handleCreatePost} className="composer-form">
-          <textarea
-            className="composer-textarea"
-            placeholder="What is happening?!"
-            rows={3}
-            value={postText}
-            onChange={(e) => setPostText(e.target.value)}
-            disabled={submitting}
-          />
-          <div className="composer-actions">
+          <div className="feed-tabs">
             <button
-              type="submit"
-              className="btn-pink"
-              disabled={submitting || !postText.trim()}
+              className={`feed-tab-btn ${currentTab === "foryou" ? "active" : ""}`}
+              onClick={() => handleTabChange("foryou")}
             >
-              {submitting ? "Mengirim..." : "Post"}
+              For You
+            </button>
+            <button
+              className={`feed-tab-btn ${currentTab === "following" ? "active" : ""}`}
+              onClick={() => handleTabChange("following")}
+            >
+              Following
             </button>
           </div>
-        </form>
 
-        {errorMsg && <p className="error-text">{errorMsg}</p>}
-
-        <div>
-          {loading ? (
-            <p className="status-text">Memuat postingan...</p>
-          ) : posts.length === 0 ? (
-            <p className="status-text">
-              {currentTab === "following"
-                ? "Belum ada postingan dari akun yang kamu ikuti."
-                : "Belum ada postingan."}
-            </p>
-          ) : (
-            posts.map((post) => (
-              <div
-                key={post.id}
-                className="post-card"
-                onClick={() => router.push(`/post/${post.id}`)}
+          <form onSubmit={handleCreatePost} className="composer-form">
+            <textarea
+              className="composer-textarea"
+              placeholder="What is happening?!"
+              rows={3}
+              value={postText}
+              onChange={(e) => setPostText(e.target.value)}
+              disabled={submitting}
+            />
+            <div className="composer-actions">
+              <button
+                type="submit"
+                className="btn-pink"
+                disabled={submitting || !postText.trim()}
               >
-                <div className="post-meta">
-                  <span className="post-author-name">
-                    {post.author.name || post.author.username}
-                  </span>
-                  <span className="post-author-handle">@{post.author.username}</span>
-                  <span className="post-time">
-                    · {new Date(post.createdAt).toLocaleString("id-ID")}
-                  </span>
+                {submitting ? "Mengirim..." : "Post"}
+              </button>
+            </div>
+          </form>
+
+          {errorMsg && <p className="error-text">{errorMsg}</p>}
+
+          <div>
+            {loading ? (
+              <p className="status-text">Memuat postingan...</p>
+            ) : posts.length === 0 ? (
+              <p className="status-text">
+                {currentTab === "following"
+                  ? "Belum ada postingan dari akun yang kamu ikuti."
+                  : "Belum ada postingan."}
+              </p>
+            ) : (
+              posts.map((post) => (
+                <div
+                  key={post.id}
+                  className="post-card"
+                  onClick={() => router.push(`/post/${post.id}`)}
+                >
+                  <div className="post-meta">
+                    <span className="post-author-name">
+                      {post.author.name || post.author.username}
+                    </span>
+                    <span className="post-author-handle">@{post.author.username}</span>
+                    <span className="post-time">
+                      · {new Date(post.createdAt).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <p className="post-content">{post.content}</p>
+                  <div className="post-actions">
+                    <span className="action-stat">
+                      <MessageCircle size={16} strokeWidth={1.9} /> {post.repliesCount}
+                    </span>
+                    <button
+                      className={`action-btn ${post.isLiked ? "liked" : ""}`}
+                      onClick={(e) => handleToggleLike(e, post.id)}
+                    >
+                      <Heart
+                        size={16}
+                        strokeWidth={1.9}
+                        fill={post.isLiked ? "currentColor" : "none"}
+                      />{" "}
+                      {post.likesCount}
+                    </button>
+                    <span className="action-stat">
+                      <BarChart2 size={16} strokeWidth={1.9} /> {post.views}
+                    </span>
+                    <button
+                      className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
+                      onClick={(e) => handleToggleBookmark(e, post.id)}
+                    >
+                      <Bookmark
+                        size={16}
+                        strokeWidth={1.9}
+                        fill={post.isBookmarked ? "currentColor" : "none"}
+                      />
+                      {post.isBookmarked ? "Saved" : "Save"}
+                    </button>
+                  </div>
                 </div>
-                <p className="post-content">{post.content}</p>
-                <div className="post-actions">
-                  <span>💬 {post.repliesCount}</span>
-                  <button
-                    className={`action-btn ${post.isLiked ? "liked" : ""}`}
-                    onClick={(e) => handleToggleLike(e, post.id)}
-                  >
-                    {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
-                  </button>
-                  <span>📊 {post.views}</span>
-                  <button
-                    className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
-                    onClick={(e) => handleToggleBookmark(e, post.id)}
-                  >
-                    {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </main>
+              ))
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
