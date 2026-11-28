@@ -33,37 +33,68 @@ type ListDetail = {
   };
 };
 
+type Post = {
+  id: string;
+  content: string;
+  views: number;
+  createdAt: string;
+  author: User;
+  repliesCount: number;
+  likesCount: number;
+  isLiked: boolean;
+  isBookmarked: boolean;
+};
+
 function ListDetailContent() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
   const [list, setList] = useState<ListDetail | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [postsError, setPostsError] = useState("");
 
   useEffect(() => {
-    async function fetchList() {
+    async function fetchData() {
       try {
-        const response = await fetch(`/api/lists/${id}`);
-        const result = await response.json();
+        const [listResponse, postsResponse] = await Promise.all([
+          fetch(`/api/lists/${id}`),
+          fetch(`/api/lists/${id}/posts`),
+        ]);
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load list");
+        const [listResult, postsResult] = await Promise.all([
+          listResponse.json(),
+          postsResponse.json(),
+        ]);
+
+        if (!listResponse.ok || !listResult.success) {
+          throw new Error(listResult.message || "Failed to load list");
         }
 
-        setList(result.data);
+        setList(listResult.data);
+
+        if (!postsResponse.ok || !postsResult.success) {
+          setPostsError(
+            postsResult.message || "Failed to load List Timeline."
+          );
+        } else {
+          setPosts(postsResult.posts || []);
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Something went wrong"
         );
       } finally {
         setLoading(false);
+        setPostsLoading(false);
       }
     }
 
     if (id) {
-      fetchList();
+      fetchData();
     }
   }, [id]);
 
@@ -151,6 +182,76 @@ function ListDetailContent() {
                   <p>@{member.user.username}</p>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="list-timeline-section">
+        <div className="list-timeline-header">
+          <h2>List Timeline</h2>
+          <p>Latest posts from accounts in this List</p>
+        </div>
+
+        {postsLoading ? (
+          <div className="timeline-empty">
+            <p>Loading posts...</p>
+          </div>
+        ) : postsError ? (
+          <div className="timeline-empty">
+            <p>{postsError}</p>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="timeline-empty">
+            <div className="timeline-empty-icon">📝</div>
+            <h3>No posts yet</h3>
+            <p>
+              Posts from accounts added to this List will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="list-posts">
+            {posts.map((post) => (
+              <article className="list-post-card" key={post.id}>
+                <div className="list-post-author">
+                  {post.author.avatarUrl ? (
+                    <img
+                      src={post.author.avatarUrl}
+                      alt={post.author.username}
+                      className="list-post-avatar"
+                    />
+                  ) : (
+                    <div className="list-post-avatar-placeholder">
+                      {(post.author.name || post.author.username)
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  )}
+
+                  <div className="list-post-author-info">
+                    <strong>
+                      {post.author.name || `@${post.author.username}`}
+                    </strong>
+                    <span>
+                      @{post.author.username} ·{" "}
+                      {new Date(post.createdAt).toLocaleString("id-ID", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="list-post-content">{post.content}</p>
+
+                <div className="list-post-stats">
+                  <span>💬 {post.repliesCount} Replies</span>
+                  <span>
+                    {post.isLiked ? "❤️" : "♡"} {post.likesCount} Likes
+                  </span>
+                  <span>👁️ {post.views} Views</span>
+                </div>
+              </article>
             ))}
           </div>
         )}
