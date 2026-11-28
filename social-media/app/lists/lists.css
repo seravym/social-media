@@ -1041,3 +1041,246 @@
 .manage-members-btn:hover {
   background: #fce0ef;
 }
+
+
+/* ========================================
+   LISTS - MATCH SETTINGS PAGE THEME
+======================================== */
+
+.lists-page,
+.list-detail-page {
+  background: #eef1f7;
+  color: #252d3b;
+  font-family: Arial, sans-serif;
+}
+
+.lists-container {
+  max-width: 1100px;
+  padding: 38px 30px;
+}
+
+.lists-header h1,
+.list-detail-header h1 {
+  color: #252d3b;
+}
+
+.lists-description,
+.communities-description {
+  color: #778397;
+}
+
+.lists-subtitle {
+  color: #d94691;
+}
+
+.lists-search input {
+  background: #fff;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  color: #252d3b;
+}
+
+.lists-search input:focus {
+  border-color: #e7a7c9;
+  box-shadow: 0 0 0 3px rgba(217, 70, 145, 0.08);
+}
+
+.lists-tabs {
+  border-bottom-color: #dfe4ed;
+}
+
+.lists-tabs button {
+  color: #778397;
+}
+
+.lists-tabs button.active {
+  color: #d94691;
+}
+
+.lists-tabs button.active::after {
+  background: #e47caf;
+}
+
+.lists-empty,
+.list-card,
+.list-detail-card,
+.list-members-section {
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(45, 58, 80, 0.045);
+}
+
+.list-card:hover {
+  border-color: #e9c4d9;
+  box-shadow: 0 8px 24px rgba(45, 58, 80, 0.08);
+}
+
+.list-card-title h2,
+.list-card-title h3,
+.list-card-content h2 {
+  color: #252d3b;
+}
+
+.list-card-description,
+.list-card-content p,
+.list-card-footer span {
+  color: #778397;
+}
+
+.list-card-title span {
+  background: #fcecf4;
+  color: #d94691;
+}
+
+.list-card-footer {
+  border-top-color: #edf0f5;
+}
+
+.create-list-btn,
+.empty-create-btn,
+.list-submit-btn,
+.save-list-btn {
+  background: #e47caf;
+  border-color: #e47caf;
+}
+
+.create-list-btn:hover,
+.empty-create-btn:hover,
+.list-submit-btn:hover,
+.save-list-btn:hover {
+  background: #d65f9a;
+}
+
+.list-modal,
+.create-list-modal {
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 18px;
+  box-shadow: 0 15px 45px rgba(35, 45, 65, 0.13);
+}
+
+.list-modal-header h2 {
+  color: #252d3b;
+}
+
+.list-form label,
+.list-form-group label {
+  color: #394456;
+}
+
+.list-form input:not([type="checkbox"]),
+.list-form textarea,
+.list-form-group input,
+.list-form-group textarea {
+  background: #f9fafd;
+  border-color: #e2e7ef;
+  color: #252d3b;
+}
+
+.list-form input:focus,
+.list-form textarea:focus,
+.list-form-group input:focus,
+.list-form-group textarea:focus {
+  border-color: #e7a7c9;
+  box-shadow: 0 0 0 3px rgba(217, 70, 145, 0.08);
+}
+
+.cancel-list-btn,
+.list-cancel-btn {
+  background: #fff;
+  border-color: #e2e7ef;
+  color: #697589;
+}
+
+.cancel-list-btn:hover,
+.list-cancel-btn:hover {
+  background: #f5f7fa;
+}
+
+.list-detail-page {
+  padding: 35px 20px;
+}
+
+.list-detail-card,
+.list-members-section {
+  border-radius: 16px;
+}
+
+.detail-title-row h2,
+.members-heading h2,
+.members-empty h3,
+.detail-empty h2 {
+  color: #252d3b;
+}
+
+.detail-description,
+.detail-owner p,
+.member-info span,
+.detail-stats span {
+  color: #778397;
+}
+
+.detail-owner {
+  border-color: #edf0f5;
+}
+
+.detail-avatar,
+.member-avatar {
+  background: #fcecf4;
+  color: #d94691;
+}
+
+.detail-stats strong,
+.members-heading span,
+.detail-label {
+  color: #d94691;
+}
+
+.member-item {
+  border-bottom-color: #edf0f5;
+}
+
+.owner-badge {
+  background: #fcecf4;
+  color: #d94691;
+}
+
+.manage-members-btn {
+  background: #fcecf4;
+  color: #d94691;
+  border-color: #f2d5e4;
+}
+
+.manage-members-btn:hover {
+  background: #f8dfeb;
+}
+
+.list-dropdown {
+  border-color: #e6eaf1;
+  box-shadow: 0 8px 22px rgba(35, 45, 65, 0.12);
+}
+
+.list-dropdown button {
+  color: #394456;
+}
+
+.list-dropdown button:hover {
+  background: #fcecf4;
+}
+
+@media (max-width: 768px) {
+  .lists-container {
+    padding: 30px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .lists-container {
+    padding: 25px 15px;
+  }
+
+  .list-detail-page {
+    padding: 22px 14px;
+  }
+}
