@@ -120,13 +120,23 @@ function ListDetailContent() {
           {new Date(list.createdAt).toLocaleDateString("id-ID")}
         </p>
 
-        <p>
-          Total Members: {list._count.members}
-        </p>
+        <p>Total Members: {list._count.members}</p>
       </div>
 
       <div className="list-members-section">
-        <h2>Members</h2>
+        <div className="members-section-header">
+          <div>
+            <h2>Members</h2>
+            <p>{list._count.members} accounts in this List</p>
+          </div>
+
+          <button
+            className="manage-members-button"
+            onClick={() => router.push(`/lists/${id}/members`)}
+          >
+            Manage Members
+          </button>
+        </div>
 
         {list.members.length === 0 ? (
           <p>No members in this list yet.</p>

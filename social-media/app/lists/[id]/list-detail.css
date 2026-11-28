@@ -123,3 +123,45 @@
     border-radius: 12px;
   }
 }
+
+
+.members-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.members-section-header h2 {
+  margin-bottom: 5px;
+}
+
+.members-section-header p {
+  color: #999;
+  font-size: 13px;
+}
+
+.manage-members-button {
+  border: none;
+  border-radius: 20px;
+  padding: 10px 18px;
+  background: #d94691;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.manage-members-button:hover {
+  background: #c02675;
+}
+
+@media (max-width: 480px) {
+  .members-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
