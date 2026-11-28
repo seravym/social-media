@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import "../../home/home.css";
 
 interface Author {
   id: string;
@@ -142,78 +143,85 @@ export default function PostDetailPage() {
     }
   };
 
-  if (loading) return <p style={{ padding: "16px" }}>Memuat detail postingan...</p>;
+  if (loading) return <div className="feed-layout"><p className="status-text">Memuat detail postingan...</p></div>;
   if (errorMsg || !post) {
     return (
-      <div style={{ padding: "16px" }}>
-        <p style={{ color: "red" }}>{errorMsg || "Postingan tidak ditemukan"}</p>
-        <Link href="/home">← Kembali ke Home</Link>
+      <div className="feed-layout">
+        <p className="error-text">{errorMsg || "Postingan tidak ditemukan"}</p>
+        <div style={{ padding: "16px" }}>
+          <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px" }}>
-      <Link href="/home">← Kembali ke Home</Link>
+    <div className="feed-layout">
+      <nav className="feed-nav">
+        <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
+      </nav>
 
-      <hr />
-
-      {/* Konten Post */}
-      <article style={{ border: "1px solid gray", padding: "16px", margin: "12px 0" }}>
-        <p>
-          <strong>{post.author.name || post.author.username}</strong> @
-          {post.author.username}
-        </p>
-        <p style={{ fontSize: "1.1rem" }}>{post.content}</p>
-        <p style={{ fontSize: "0.85rem", color: "gray" }}>
+      <article className="post-detail-card">
+        <div className="post-meta">
+          <span className="post-author-name">
+            {post.author.name || post.author.username}
+          </span>
+          <span className="post-author-handle">@{post.author.username}</span>
+        </div>
+        <p className="post-content" style={{ fontSize: "1.1rem" }}>{post.content}</p>
+        <p className="post-time" style={{ marginBottom: "12px" }}>
           {new Date(post.createdAt).toLocaleString("id-ID")} · 📊 {post.views} Views
         </p>
-        <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+        <div className="post-actions">
           <span>💬 {post.repliesCount} Balasan</span>
-          <button onClick={handleToggleLike}>
-            {post.isLiked ? "❤️" : "🤍"} ({post.likesCount})
+          <button
+            className={`action-btn ${post.isLiked ? "liked" : ""}`}
+            onClick={handleToggleLike}
+          >
+            {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
           </button>
-          <button onClick={handleDeletePost} style={{ color: "red" }}>
+          <button className="action-btn danger" onClick={handleDeletePost}>
             🗑️ Hapus
           </button>
         </div>
       </article>
 
-      {/* Form Komentar */}
-      <form onSubmit={handleAddComment} style={{ margin: "16px 0" }}>
-        <h3>Tulis Reply</h3>
+      <form onSubmit={handleAddComment} className="composer-form">
         <textarea
+          className="composer-textarea"
           placeholder="Post your reply"
           rows={3}
-          style={{ width: "100%" }}
           value={replyText}
           onChange={(e) => setReplyText(e.target.value)}
           disabled={submitting}
         />
-        <br />
-        <button type="submit" disabled={submitting || !replyText.trim()}>
-          {submitting ? "Mengirim..." : "Reply"}
-        </button>
+        <div className="composer-actions">
+          <button
+            type="submit"
+            className="btn-pink"
+            disabled={submitting || !replyText.trim()}
+          >
+            {submitting ? "Mengirim..." : "Reply"}
+          </button>
+        </div>
       </form>
 
-      <hr />
-
-      {/* Daftar Komentar */}
       <section>
-        <h3>Comments ({post.comments.length})</h3>
         {post.comments.length === 0 ? (
-          <p>Belum ada komentar.</p>
+          <p className="status-text">Belum ada balasan.</p>
         ) : (
           post.comments.map((c) => (
-            <div
-              key={c.id}
-              style={{ borderBottom: "1px solid #ccc", padding: "10px 0" }}
-            >
-              <p>
-                <strong>{c.user.name || c.user.username}</strong> @{c.user.username} ·{" "}
-                {new Date(c.createdAt).toLocaleString("id-ID")}
-              </p>
-              <p>{c.content}</p>
+            <div key={c.id} className="comment-item">
+              <div className="post-meta">
+                <span className="post-author-name">
+                  {c.user.name || c.user.username}
+                </span>
+                <span className="post-author-handle">@{c.user.username}</span>
+                <span className="post-time">
+                  · {new Date(c.createdAt).toLocaleString("id-ID")}
+                </span>
+              </div>
+              <p className="post-content" style={{ marginBottom: 0 }}>{c.content}</p>
             </div>
           ))
         )}
