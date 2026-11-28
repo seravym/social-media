@@ -123,3 +123,402 @@
     border-radius: 12px;
   }
 }
+
+
+.members-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.members-section-header h2 {
+  margin-bottom: 5px;
+}
+
+.members-section-header p {
+  color: #999;
+  font-size: 13px;
+}
+
+.manage-members-button {
+  border: none;
+  border-radius: 20px;
+  padding: 10px 18px;
+  background: #d94691;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.manage-members-button:hover {
+  background: #c02675;
+}
+
+@media (max-width: 480px) {
+  .members-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+
+/* LIST TIMELINE */
+
+.list-timeline-section {
+  margin-top: 30px;
+  padding: 25px;
+  background: #fff;
+  border: 1px solid #f3dce9;
+  border-radius: 16px;
+}
+
+.list-timeline-header {
+  margin-bottom: 20px;
+}
+
+.list-timeline-header h2 {
+  color: #302536;
+  font-size: 21px;
+  margin-bottom: 6px;
+}
+
+.list-timeline-header p {
+  color: #999;
+  font-size: 13px;
+}
+
+.timeline-empty {
+  padding: 45px 20px;
+  text-align: center;
+  background: #fdf7fb;
+  border-radius: 12px;
+}
+
+.timeline-empty-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.timeline-empty h3 {
+  color: #302536;
+  margin-bottom: 8px;
+}
+
+.timeline-empty p {
+  color: #999;
+  font-size: 14px;
+}
+
+.list-posts {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-post-card {
+  padding: 20px 0;
+  border-bottom: 1px solid #f3e5ed;
+}
+
+.list-post-card:first-child {
+  padding-top: 0;
+}
+
+.list-post-card:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.list-post-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.list-post-avatar,
+.list-post-avatar-placeholder {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.list-post-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8dce9;
+  color: #d94691;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.list-post-author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.list-post-author-info strong {
+  color: #302536;
+  font-size: 14px;
+}
+
+.list-post-author-info span {
+  color: #999;
+  font-size: 12px;
+}
+
+.list-post-content {
+  color: #423747;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 16px;
+}
+
+.list-post-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  color: #999;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .list-timeline-section {
+    padding: 18px;
+  }
+
+  .list-post-stats {
+    gap: 14px;
+  }
+
+  .list-post-author-info span {
+    font-size: 11px;
+  }
+}
+
+
+.list-like-button {
+  border: none;
+  background: transparent;
+  color: #999;
+  font: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: 0.2s;
+}
+
+.list-like-button:hover {
+  color: #e84b9b;
+}
+
+.list-like-button.liked {
+  color: #e84b9b;
+}
+
+.list-like-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+
+/* REPLIES BUTTON */
+
+.list-replies-button {
+  border: none;
+  background: transparent;
+  color: #777;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 5px 0;
+  transition: color 0.2s ease;
+}
+
+.list-replies-button:hover,
+.list-replies-button.active {
+  color: #d94691;
+}
+
+/* REPLIES SECTION */
+
+.list-replies-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fdf7fb;
+  border-radius: 12px;
+  border: 1px solid #f3dce9;
+}
+
+.list-replies-section h3 {
+  font-size: 15px;
+  color: #302536;
+  margin: 0 0 14px;
+}
+
+.replies-message {
+  color: #999;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+/* COMMENT ITEM */
+
+.list-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.list-comment-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.list-comment-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f4c9df;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a83270;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.list-comment-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.list-comment-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-comment-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.list-comment-heading strong {
+  font-size: 13px;
+  color: #302536;
+}
+
+.list-comment-heading span {
+  font-size: 12px;
+  color: #999;
+}
+
+.list-comment-content p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #514653;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.list-comment-content small {
+  font-size: 11px;
+  color: #aaa;
+}
+
+/* REPLY FORM */
+
+.list-reply-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.list-reply-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #ead5e1;
+  background: white;
+  border-radius: 20px;
+  padding: 10px 15px;
+  font-size: 13px;
+  outline: none;
+  color: #302536;
+}
+
+.list-reply-form input:focus {
+  border-color: #e84b9b;
+}
+
+.list-reply-form button {
+  border: none;
+  border-radius: 20px;
+  background: #e84b9b;
+  color: white;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.list-reply-form button:hover {
+  background: #d13683;
+}
+
+.list-reply-form button:disabled {
+  background: #e8b7d0;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .list-replies-section {
+    padding: 12px;
+  }
+
+  .list-reply-form {
+    gap: 7px;
+  }
+
+  .list-reply-form button {
+    padding: 0 13px;
+  }
+}
+
+
+/* BOOKMARK BUTTON */
+
+.list-bookmark-button {
+  border: none;
+  background: transparent;
+  color: #777;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 5px 0;
+  transition: color 0.2s ease;
+}
+
+.list-bookmark-button:hover,
+.list-bookmark-button.bookmarked {
+  color: #d94691;
+}
+
+.list-bookmark-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

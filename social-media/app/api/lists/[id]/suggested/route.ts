@@ -1,18 +1,36 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
+
+async function getCurrentUserId() {
+  return (
+    (await getSessionUserId()) ||
+    process.env.NEXT_PUBLIC_TEST_USER_ID ||
+    null
+  );
+}
 
 export async function GET(
   request: NextRequest,
   { params }: Context
 ) {
   try {
+    const currentUserId = await getCurrentUserId();
+
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const listId = Number(id);
-    const ownerId = request.nextUrl.searchParams.get("ownerId");
 
     if (!Number.isInteger(listId) || listId <= 0) {
       return NextResponse.json(
@@ -21,16 +39,11 @@ export async function GET(
       );
     }
 
-    if (!ownerId) {
-      return NextResponse.json(
-        { success: false, message: "Owner ID is required." },
-        { status: 400 }
-      );
-    }
-
     const list = await prisma.list.findUnique({
       where: { id: listId },
-      include: {
+      select: {
+        id: true,
+        ownerId: true,
         members: {
           select: {
             userId: true,
@@ -46,9 +59,12 @@ export async function GET(
       );
     }
 
-    if (list.ownerId !== ownerId) {
+    if (list.ownerId !== currentUserId) {
       return NextResponse.json(
-        { success: false, message: "You are not allowed to manage this list." },
+        {
+          success: false,
+          message: "You are not allowed to manage this list.",
+        },
         { status: 403 }
       );
     }
@@ -83,7 +99,10 @@ export async function GET(
     console.error("Get Suggested Users Error:", error);
 
     return NextResponse.json(
-      { success: false, message: "Failed to fetch suggested users." },
+      {
+        success: false,
+        message: "Failed to fetch suggested users.",
+      },
       { status: 500 }
     );
   }

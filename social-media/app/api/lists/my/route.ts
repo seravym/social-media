@@ -1,16 +1,19 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionUserId } from "@/lib/session";
 
 // GET: Mengambil semua List yang dibuat oleh user
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get("userId");
+    const userId =
+      (await getSessionUserId()) ||
+      process.env.NEXT_PUBLIC_TEST_USER_ID ||
+      null;
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "User ID is required" },
-        { status: 400 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
       );
     }
 
