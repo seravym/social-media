@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import "../../home/home.css";
+
 
 interface Author {
   id: string;
@@ -32,7 +33,7 @@ interface PostDetail {
   comments: Comment[];
 }
 
-export default function PostDetailPage() {
+function PostDetailContent() {
   const params = useParams();
   const router = useRouter();
   const postId = params.id as string;
@@ -227,5 +228,18 @@ export default function PostDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+export default function PostDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="feed-layout">
+          <p className="status-text">Memuat detail postingan...</p>
+        </div>
+      }
+    >
+      <PostDetailContent />
+    </Suspense>
   );
 }

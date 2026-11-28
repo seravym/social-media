@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import ".home.css";
+import "./home.css";
 
 interface Author {
   id: string;
@@ -125,18 +124,6 @@ export default function HomePage() {
 
   return (
     <div className="feed-layout">
-      <nav className="feed-nav">
-        <ul className="feed-nav-list">
-          <li><Link href="/home" className="feed-nav-link active">Home</Link></li>
-          <li><Link href="/explore" className="feed-nav-link">Explore</Link></li>
-          <li><Link href="/notifications" className="feed-nav-link">Notifications</Link></li>
-          <li><Link href="/conversations" className="feed-nav-link">Messages</Link></li>
-          <li><Link href="/communities" className="feed-nav-link">Communities</Link></li>
-          <li><Link href="/bookmark" className="feed-nav-link">Bookmarks</Link></li>
-          <li><Link href="/follow" className="feed-nav-link">Follow</Link></li>
-          <li><Link href="/settings" className="feed-nav-link">Settings</Link></li>
-        </ul>
-      </nav>
 
       <main>
         <div className="feed-header">
