@@ -3,10 +3,12 @@
 }
 
 .profile-layout {
+display:flex;
   width: 100%;
   min-height: 100vh;
   background-color: #ffffff;
-  color: #181518;
+  color: #5b2733;
+  overflow-x: clip;
 }
 
 .profile-page {
@@ -18,7 +20,7 @@
   position: relative;
   width: 75%;
   height: 180px;
-  background:  #ffb6d8
+  overflow:hidden;
 }
 
 .banner-img {
@@ -30,11 +32,11 @@
 
 }
 
-/* Blok Dusty Pink lebar penuh */
 .profile-information {
   width: 75%;
+  min-height: 350px;
   height: 300px;
-  background-color: #cfaab2;
+  background-color:#cfaab2 ;
   padding: 0 36px 28px;
 }
 
@@ -45,13 +47,13 @@
   gap: 24px;
 }
 
-/* Avatar bulat pas di garis batas banner & kotak pink */
+
 .profile-picture {
-  width: 150px;
-  height: 150px;
-  margin-top: 10px;
+  width: 200px;
+  height: 200px;
+  margin-top: -30px;
   border-radius: 50%;
-  border: 4px solid #903b4e;
+  border: 5px solid #903b4e;
   background-color: #e9d8dc;
   display: flex;
   align-items: center;
@@ -60,6 +62,7 @@
   font-weight: 600;
   color: #4a3b40;
   flex-shrink: 0;
+  position: relative;
 }
 
 .profile-picture img {
@@ -93,6 +96,7 @@
   flex-direction: column;
   gap: 10px;
   padding-top: 14px;
+  position: relative
 }
 
 .profile-actions button {
@@ -107,15 +111,15 @@
 }
 
 .profile-actions button:hover {
-  background-color: #faf5f6;
+  background-color: #EFD47A;
 }
 
 .profile-details {
-  margin-top: 8px;
+  margin-top: 20px;
 }
 
 .profile-details h2 {
-  margin: 0;
+  margin: 0px;
   font-size: 38px;
   font-weight: 800;
   line-height: 1.15;
@@ -131,4 +135,108 @@
   margin: 0;
   font-size: 15px;
   color: #3d3135;
+}
+
+.profile-navigation {
+  display: flex;
+  width: 75%;
+  background-color: #fbf7f8;
+  border-bottom: 1px solid #8a4b5a;
+  position: relative;
+}
+
+.profile-navigation div {
+  flex: 1;
+  text-align: center;
+  
+  padding: 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #4a3b40;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.profile-navigation div.active {
+  font-weight: 800;
+}
+
+
+.profile-navigation div.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background-color: #7c3849;
+}
+
+.profile-posts {
+  width: 75%;
+  padding: 5px 0;
+  background-color: #ffffff;
+}
+
+.post-item {
+width: 100%;
+  max-width: 100%;
+  border: 1.5px solid #7c3849;
+  background-color: #fbf7f8;
+  padding: 18px 24px 16px;
+  margin-bottom: 10px;
+}
+
+.post-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.post-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.post-author-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.post-author-wrap strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: #181518;
+}
+
+.post-author-wrap span {
+  font-size: 14px;
+  color: #6f676a;
+}
+
+.post-body {
+  margin: 0 0 18px;
+  font-size: 15px;
+  color: #181518;
+}
+
+.post-actions {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  font-size: 13px;
+  color: #2b2226;
+}
+
+.post-actions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }

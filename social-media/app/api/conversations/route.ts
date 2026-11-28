@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/client";
 import { prisma } from "@/lib/prisma";
 import { toUserCard, userCardSelect } from "@/lib/dto";
 import { authed, json } from "@/lib/route";
+import { checkDirectMessagePermission } from "@/lib/messaging-privacy";
 import type { ConversationDto } from "@/lib/types";
 
 export const GET = authed(async (user) => {
@@ -83,9 +84,25 @@ export const POST = authed(async (user, req) => {
     return json({ error: "Cannot chat with yourself" }, 400);
   }
 
-  const other = await prisma.user.findUnique({ where: { id: body.userId } });
-  if (!other) {
+  const [self, other] = await Promise.all([
+    prisma.user.findUnique({ where: { id: user.id }, select: { username: true } }),
+    prisma.user.findUnique({
+      where: { id: body.userId },
+      select: { id: true, username: true },
+    }),
+  ]);
+  if (!self || !other) {
     return json({ error: "User not found" }, 404);
+  }
+
+  const permission = await checkDirectMessagePermission({
+    senderId: user.id,
+    senderUsername: self.username,
+    recipientId: other.id,
+    recipientUsername: other.username,
+  });
+  if (!permission.allowed) {
+    return json({ error: permission.reason }, 403);
   }
 
   const mine = await prisma.conversationMember.findMany({

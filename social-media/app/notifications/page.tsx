@@ -10,6 +10,8 @@ import {
   Home,
   MessageSquare,
   Settings,
+  TrendingUp,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -30,6 +32,19 @@ interface ToastItem {
   undoIds?: string[];
 }
 
+interface TrendingItem {
+  id: string;
+  name: string;
+  category?: string | null;
+  postCount: number;
+}
+
+interface AccountItem {
+  id: string;
+  name: string | null;
+  username: string;
+}
+
 const HIDDEN_KEY = "social_media_hidden_notifs_v1";
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
@@ -44,6 +59,9 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [tab, setTab] = useState<FilterTab>("all");
   const [items, setItems] = useState<NotificationDto[]>([]);
+  const [trending, setTrending] = useState<TrendingItem[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [exploreLoading, setExploreLoading] = useState(true);
   const [hiddenIds, setHiddenIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -136,6 +154,25 @@ export default function NotificationsPage() {
     };
   }, [fetchNotifications]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/explore", { cache: "no-store", signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.trending) {
+          setTrending((data.trending as TrendingItem[]).slice(0, 5));
+        }
+        if (data?.accounts) {
+          setAccounts((data.accounts as AccountItem[]).slice(0, 3));
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setExploreLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
   const visibleItems = useMemo(
     () => items.filter((n) => !hiddenSet.has(n.id)),
@@ -145,18 +182,6 @@ export default function NotificationsPage() {
     () => visibleItems.filter((n) => !n.isRead).length,
     [visibleItems],
   );
-
-  const summary = useMemo(() => {
-    let like = 0;
-    let follow = 0;
-    let reply = 0;
-    for (const n of visibleItems) {
-      if (n.type === "like") like += 1;
-      else if (n.type === "follow") follow += 1;
-      else if (n.type === "reply" || n.type === "mention") reply += 1;
-    }
-    return { like, follow, reply };
-  }, [visibleItems]);
 
   const grouped = useMemo(() => {
     const filtered = visibleItems.filter((n) => {
@@ -390,38 +415,93 @@ export default function NotificationsPage() {
         </main>
 
         <aside className="hidden lg:block">
-          <div className="glass-panel sticky top-16 overflow-hidden rounded-2xl">
-            <div className="border-b border-white/75 px-4 py-3">
-              <h2 className="text-xs font-semibold text-slate-900">
-                Ringkasan Aktivitas
-              </h2>
-            </div>
-            <div className="divide-y divide-white/65 text-xs">
-              {(
-                [
-                  { key: "unread", label: "Belum dibaca", count: unreadCount },
-                  { key: "like", label: "Suka", count: summary.like },
-                  { key: "follow", label: "Pengikut baru", count: summary.follow },
-                  { key: "reply", label: "Balasan & sebutan", count: summary.reply },
-                ] as const
-              ).map((row) => (
-                <button
-                  key={row.key}
-                  type="button"
-                  onClick={() => setTab(row.key)}
-                  className={`flex w-full items-center justify-between px-4 py-3 text-left transition ${
-                    tab === row.key
-                      ? "bg-[#faf0f3]/70 font-semibold text-[#9e4865]"
-                      : "text-slate-600 hover:bg-white/60"
-                  }`}
+          <div className="sticky top-16 space-y-4">
+            <div className="glass-panel overflow-hidden rounded-2xl">
+              <div className="flex items-center justify-between border-b border-white/75 px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-[#b85c7a]" />
+                  <h2 className="text-xs font-semibold text-slate-900">
+                    Trending
+                  </h2>
+                </div>
+                <Link
+                  href="/explore"
+                  className="text-[11px] font-medium text-[#b85c7a] transition hover:text-[#9e4865]"
                 >
-                  <span>{row.label}</span>
-                  <span className="font-semibold text-slate-800">
-                    {row.count}
-                  </span>
-                </button>
-              ))}
+                  Lihat semua
+                </Link>
+              </div>
+
+              {exploreLoading ? (
+                <div className="divide-y divide-white/60">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="animate-pulse space-y-1.5 px-4 py-3">
+                      <div className="h-3 w-2/3 rounded bg-slate-200/80" />
+                      <div className="h-2.5 w-1/3 rounded bg-slate-200/60" />
+                    </div>
+                  ))}
+                </div>
+              ) : trending.length === 0 ? (
+                <p className="px-4 py-5 text-center text-xs text-slate-400">
+                  Belum ada topik trending.
+                </p>
+              ) : (
+                <ul className="divide-y divide-white/65">
+                  {trending.map((topic) => (
+                    <li key={topic.id}>
+                      <Link
+                        href={`/explore?q=${encodeURIComponent(topic.name)}`}
+                        className="block px-4 py-3 transition hover:bg-white/60"
+                      >
+                        <p className="truncate text-xs font-semibold text-slate-800">
+                          {topic.name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {topic.category ? `${topic.category} · ` : ""}
+                          {topic.postCount} postingan
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
+            {accounts.length > 0 && (
+              <div className="glass-panel overflow-hidden rounded-2xl">
+                <div className="flex items-center gap-1.5 border-b border-white/75 px-4 py-3">
+                  <UserPlus className="h-3.5 w-3.5 text-[#b85c7a]" />
+                  <h2 className="text-xs font-semibold text-slate-900">
+                    Mungkin kamu kenal
+                  </h2>
+                </div>
+                <ul className="divide-y divide-white/65">
+                  {accounts.map((acc) => {
+                    const display = acc.name?.trim() || acc.username;
+                    return (
+                      <li key={acc.id}>
+                        <Link
+                          href={`/profile/${acc.id}`}
+                          className="flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-white/60"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#faf0f3] text-xs font-semibold text-[#b85c7a]">
+                            {display.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-slate-800">
+                              {display}
+                            </p>
+                            <p className="truncate text-[11px] text-slate-400">
+                              @{acc.username}
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
         </aside>
       </div>
