@@ -2,12 +2,14 @@
 
 import { Suspense, useEffect, useState } from "react";import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 
 type Article = {
     id: string;
     title: string;
     content: string;
     category: string;
+    coverImageUrl?: string | null;
     views: number;
     createdAt: string;
     author: { name: string | null; username: string };
@@ -143,17 +145,19 @@ function ArticleDetail() {
     }
 
     return (
-        <main className="mx-auto w-full max-w-4xl px-6 py-8">
+        <div className="bg-dot-canvas min-h-dvh text-slate-900">
+        <main className="mx-auto w-full max-w-5xl px-3 py-5 sm:px-4">
+        <div className="glass-panel rounded-2xl p-5">
         <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-            <Link href="/articles" aria-label="Kembali" className="text-xl">
+            <Link href="/articles" aria-label="Kembali" className="text-xl text-[#b85c7a] hover:text-[#9e4865]">
                 ←
             </Link>
-            <h1 className="text-2xl font-bold text-pink-600">Articles</h1>
+            <h1 className="text-2xl font-bold text-[#b85c7a]">Articles</h1>
             </div>
             <Link
             href="/articles/new"
-            className="rounded-full bg-pink-600 px-4 py-2 text-base font-semibold text-white hover:bg-pink-700"
+            className="rounded-full bg-[#b85c7a] px-4 py-2 text-base font-semibold text-white transition hover:bg-[#9e4865]"
             >
             New Articles
             </Link>
@@ -169,14 +173,36 @@ function ArticleDetail() {
 
         {status === "ok" && article && (
             <article>
-            <div className="flex h-48 items-end rounded-xl bg-gradient-to-br from-pink-500 to-rose-700 p-3">
-                <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold">
-                {article.category}
+            <div
+                className={`relative flex h-40 items-end overflow-hidden rounded-xl p-3 ${
+                    article.coverImageUrl
+                        ? ""
+                        : "bg-gradient-to-br from-pink-500 to-rose-700"
+                }`}
+            >
+                {article.coverImageUrl && (
+                    <Image
+                        src={article.coverImageUrl}
+                        alt={article.title}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                    />
+                )}
+
+                {article.coverImageUrl && (
+                    <div className="absolute inset-0 bg-black/20" />
+                )}
+
+                <span className="relative rounded-full bg-white px-3 py-1 text-sm font-semibold">
+                    {article.category}
                 </span>
             </div>
 
-            <h2 className="mt-4 text-3xl font-bold">{article.title}</h2>
-            <p className="mt-2 text-base text-gray-500">
+            <h2 className="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">
+                {article.title}
+            </h2>
+            <p className="mt-2 text-base text-slate-500">
                 {article.author.name ?? article.author.username} @{article.author.username} ·{" "}
                 {formatDate(article.createdAt)} · {readTime(article.content)} mnt baca
             </p>
@@ -189,11 +215,10 @@ function ArticleDetail() {
                 ))}
             </div>
 
-            {/* aksi: suka, komentar, tayangan, simpan, hapus */}
             <div className="mt-6 flex items-center gap-5 border-t border-gray-200 pt-3 text-base text-gray-500">
                 <button
                 onClick={toggleLike}
-                className={article.liked ? "font-semibold text-pink-600" : "hover:text-pink-600"}
+                className={article.liked ? "font-semibold text-[#b85c7a]" : "hover:text-[#b85c7a]"}
                 >
                 {article.liked ? "♥" : "♡"} {article.likeCount}
                 </button>
@@ -201,7 +226,7 @@ function ArticleDetail() {
                 <span>{article.views} tayangan</span>
                 <button
                 onClick={toggleSave}
-                className={article.saved ? "font-semibold text-pink-600" : "hover:text-pink-600"}
+                className={article.saved ? "font-semibold text-[#b85c7a]" : "hover:text-[#b85c7a]"}
                 >
                 {article.saved ? "Tersimpan" : "Simpan"}
                 </button>
@@ -216,7 +241,6 @@ function ArticleDetail() {
                 )}
             </div>
 
-            {/* komentar */}
             <section className="mt-8">
                 <h3 className="font-bold">Komentar ({article.commentCount})</h3>
 
@@ -225,8 +249,7 @@ function ArticleDetail() {
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
                 placeholder="Tulis komentar Anda"
-                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
-                />
+                className="mt-2 w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-3 text-base outline-none transition focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-200"/>
                 <div className="mt-1 flex items-center justify-between">
                 <span
                     className={`text-sm ${text.length > MAX_COMMENT ? "text-red-600" : "text-gray-500"}`}
@@ -236,7 +259,7 @@ function ArticleDetail() {
                 <button
                     onClick={submitComment}
                     disabled={posting}
-                    className="rounded-full bg-pink-600 px-4 py-1.5 text-base font-semibold text-white hover:bg-pink-700 disabled:opacity-60"
+                    className="rounded-full bg-[#b85c7a] px-4 py-1.5 text-base font-semibold text-white transition hover:bg-[#9e4865] disabled:opacity-60"
                 >
                     {posting ? "Mengirim..." : "Kirim"}
                 </button>
@@ -270,8 +293,10 @@ function ArticleDetail() {
                 )}
             </section>
             </article>
-        )}
+            )}
+        </div>
         </main>
+        </div>
     );
 }
 export default function ArticleDetailPage() {
