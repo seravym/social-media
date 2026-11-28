@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExploreSidebar from "@/components/social/ExploreSidebar";
 
 type News = { id: string; title: string; summary: string; category: string; postCount: number; createdAt: string };
 type Trend = { id: string; name: string; category: string; postCount: number };
@@ -220,7 +221,9 @@ export default function ExplorePage() {
     );
 
     return (
-        <main className="mx-auto w-full max-w-4xl px-6 py-8">
+    <div className="bg-dot-canvas min-h-dvh text-slate-900">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <main className="glass-panel overflow-hidden rounded-2xl p-5">
         <div className="relative mb-4 flex items-center gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
@@ -405,6 +408,9 @@ export default function ExplorePage() {
             )}
             </>
         )}
-        </main>
+    </main>
+    <ExploreSidebar/>
+    </div>
+    </div>
     );
 }
