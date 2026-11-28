@@ -500,3 +500,25 @@
   }
 }
 
+
+/* BOOKMARK BUTTON */
+
+.list-bookmark-button {
+  border: none;
+  background: transparent;
+  color: #777;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 5px 0;
+  transition: color 0.2s ease;
+}
+
+.list-bookmark-button:hover,
+.list-bookmark-button.bookmarked {
+  color: #d94691;
+}
+
+.list-bookmark-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

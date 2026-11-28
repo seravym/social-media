@@ -68,24 +68,33 @@ function ListDetailContent() {
     new Set()
   );
 
+  const [bookmarkingPostIds, setBookmarkingPostIds] = useState<
+    Set<string>
+  >(new Set());
+
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(
     new Set()
   );
+
   const [commentsByPost, setCommentsByPost] = useState<
     Record<string, Comment[]>
   >({});
+
   const [loadedCommentPostIds, setLoadedCommentPostIds] = useState<
     Set<string>
   >(new Set());
+
   const [loadingCommentPostIds, setLoadingCommentPostIds] = useState<
     Set<string>
   >(new Set());
+
   const [commentInputs, setCommentInputs] = useState<
     Record<string, string>
   >({});
-  const [submittingPostIds, setSubmittingPostIds] = useState<Set<string>>(
-    new Set()
-  );
+
+  const [submittingPostIds, setSubmittingPostIds] = useState<
+    Set<string>
+  >(new Set());
 
   useEffect(() => {
     async function fetchData() {
@@ -181,6 +190,64 @@ function ListDetailContent() {
     }
   }
 
+  async function handleBookmark(post: Post) {
+    if (bookmarkingPostIds.has(post.id)) return;
+
+    setBookmarkingPostIds((previous) => {
+      const updated = new Set(previous);
+      updated.add(post.id);
+      return updated;
+    });
+
+    try {
+      const response = await fetch(
+        post.isBookmarked
+          ? `/api/bookmarks?postId=${encodeURIComponent(post.id)}`
+          : "/api/bookmarks",
+        {
+          method: post.isBookmarked ? "DELETE" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          ...(!post.isBookmarked && {
+            body: JSON.stringify({ postId: post.id }),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update bookmark."
+        );
+      }
+
+      setPosts((previous) =>
+        previous.map((item) =>
+          item.id === post.id
+            ? {
+                ...item,
+                isBookmarked: !item.isBookmarked,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to update bookmark."
+      );
+    } finally {
+      setBookmarkingPostIds((previous) => {
+        const updated = new Set(previous);
+        updated.delete(post.id);
+        return updated;
+      });
+    }
+  }
+
   async function handleToggleReplies(postId: string) {
     const isExpanded = expandedPostIds.has(postId);
 
@@ -208,6 +275,7 @@ function ListDetailContent() {
       const response = await fetch(
         `/api/posts/${postId}/comments`
       );
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -490,6 +558,17 @@ function ListDetailContent() {
                     {post.isLiked ? "❤️" : "♡"}{" "}
                     {post.likesCount}{" "}
                     {post.likesCount === 1 ? "Like" : "Likes"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`list-bookmark-button ${
+                      post.isBookmarked ? "bookmarked" : ""
+                    }`}
+                    onClick={() => handleBookmark(post)}
+                    disabled={bookmarkingPostIds.has(post.id)}
+                  >
+                    {post.isBookmarked ? "🔖 Saved" : "♧ Bookmark"}
                   </button>
 
                   <span>👁️ {post.views} Views</span>
