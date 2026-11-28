@@ -55,13 +55,22 @@ export const POST = authed(async (me, req) => {
   const title = String(body?.title ?? "").trim();
   const content = String(body?.content ?? "").trim();
   const category = String(body?.category ?? "");
+  const coverImageUrl =
+    String(body?.coverImageUrl ?? "").trim() || null;
 
   if (title.length < 5) return json({ error: "Judul minimal 5 karakter." }, 400);
   if (content.length < 80) return json({ error: "Isi minimal 80 karakter." }, 400);
   if (!CATEGORIES.includes(category)) return json({ error: "Kategori tidak valid." }, 400);
 
   const article = await prisma.article.create({
-    data: { title, content, category, authorId: me.id, publishedAt: new Date() },
+    data: {
+        title,
+        content,
+        category,
+        coverImageUrl,
+        authorId: me.id,
+        publishedAt: new Date(),
+    },
   });
   return json(article, 201);
 });

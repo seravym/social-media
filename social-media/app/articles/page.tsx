@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExploreSidebar from "@/components/social/ExploreSidebar";
+import Image from "next/image";
 
 type Article = {
     id: string;
     title: string;
     content: string;
     category: string;
+    coverImageUrl?: string | null;
     views: number;
     createdAt: string;
     author: { name: string | null; username: string };
@@ -58,13 +61,14 @@ export default function ArticlesPage() {
     }, [tab, query]);
 
     return (
-        <main className="mx-auto w-full max-w-4xl px-6 py-8">
+    <div className="bg-dot-canvas min-h-dvh text-slate-900">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <main className="glass-panel overflow-hidden rounded-2xl p-5">
         <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-pink-600">Articles</h1>
+            <h1 className="text-2xl font-bold text-[#b85c7a]">Articles</h1>
             <Link
             href="/articles/new"
-            className="rounded-full bg-pink-600 px-4 py-2 text-base font-semibold text-white hover:bg-pink-700"
-            >
+            className="rounded-full bg-[#b85c7a] px-4 py-2 text-base font-semibold text-white hover:bg-[#9e4865]"            >
             New Articles
             </Link>
         </div>
@@ -81,10 +85,10 @@ export default function ArticlesPage() {
             <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`whitespace-nowrap pb-2 text-base font-semibold ${
+                className={`shrink-0 border-b-2 py-2.5 text-m font-medium transition ${
                 tab === t
-                    ? "border-b-2 border-pink-600 text-pink-600"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "border-[#b85c7a] font-semibold text-[#9e4865]"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
             >
                 {t}
@@ -107,9 +111,29 @@ export default function ArticlesPage() {
             {articles.map((a) => (
             <li key={a.id}>
                 <Link href={`/articles/${a.id}`} className="block">
-                <div className="flex h-40 items-end rounded-xl bg-gradient-to-br from-pink-500 to-rose-700 p-3">
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold">
-                    {a.category}
+                <div
+                    className={`relative flex h-40 items-end overflow-hidden rounded-xl p-3 ${
+                        a.coverImageUrl
+                            ? ""
+                            : "bg-gradient-to-br from-pink-500 to-rose-700"
+                    }`}
+                >
+                    {a.coverImageUrl && (
+                        <Image
+                            src={a.coverImageUrl}
+                            alt={a.title}
+                            fill
+                            unoptimized
+                            className="object-cover"
+                        />
+                    )}
+
+                    {a.coverImageUrl && (
+                        <div className="absolute inset-0 bg-black/20" />
+                    )}
+
+                    <span className="relative rounded-full bg-white px-3 py-1 text-sm font-semibold">
+                        {a.category}
                     </span>
                 </div>
                 <p className="mt-2 text-sm text-gray-500">
@@ -125,6 +149,9 @@ export default function ArticlesPage() {
             </li>
             ))}
         </ul>
-        </main>
+    </main>
+    <ExploreSidebar/>
+    </div>
+    </div>
     );
 }

@@ -2,10 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExploreSidebar from "@/components/social/ExploreSidebar";
 
 type News = { id: string; title: string; summary: string; category: string; postCount: number; createdAt: string };
 type Trend = { id: string; name: string; category: string; postCount: number };
 type Account = { id: string; name: string | null; username: string };
+type Post = {
+    id: string;
+    content: string;
+    category: string;
+    replyCount: number;
+    likeCount: number;
+    views: number;
+    createdAt: string;
+    author: Account;
+};
 type HistoryItem = { id: string; query: string };
 
 const TABS = ["Explore", "Trending", "News", "Sports", "Entertainment"] as const;
@@ -44,12 +55,23 @@ function Highlight({ text, query }: { text: string; query: string }) {
     );
 }
 
+function Avatar({ name }: { name: string }) {
+    return (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
+        {name.charAt(0).toUpperCase()}
+        </div>
+    );
+}
+
 export default function ExplorePage() {
     const [tab, setTab] = useState<Tab>("Explore");
     const [query, setQuery] = useState("");
     const [news, setNews] = useState<News[]>([]);
     const [trending, setTrending] = useState<Trend[]>([]);
+    const [posts, setPosts] = useState<Post[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [following, setFollowing] = useState<Record<string, boolean>>({});
+    const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [focused, setFocused] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -58,8 +80,44 @@ export default function ExplorePage() {
         const res = await fetch("/api/explore/history");
         if (res.ok) setHistory(await res.json());
     }
+    
+    async function toggleFollow(accountId: string) {
+        if (followLoading[accountId]) return;
 
-        useEffect(() => {
+        setFollowLoading((prev) => ({
+            ...prev,
+            [accountId]: true,
+        }));
+        try {
+            const res = await fetch("/api/follow", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    followingId: accountId,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || "Gagal memproses follow");
+                return;
+            }
+            setFollowing((prev) => ({
+                ...prev,
+                [accountId]: data.following,
+            }));
+        } catch {
+            alert("Terjadi kesalahan saat memproses follow");
+        } finally {
+            setFollowLoading((prev) => ({
+                ...prev,
+                [accountId]: false,
+            }));
+        }
+    }
+
+    useEffect(() => {
         let cancelled = false;
         (async () => {
         const res = await fetch("/api/explore/history");
@@ -67,6 +125,32 @@ export default function ExplorePage() {
         })();
         return () => {
         cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadFollowing() {
+            try {
+                const res = await fetch("/api/follow");
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) {
+                    const status: Record<string, boolean> = {};
+                    (data.users ?? []).forEach(
+                        (user: { id: string; isFollowing: boolean }) => {
+                            status[user.id] = user.isFollowing;
+                        }
+                    );
+                    setFollowing(status);
+                }
+            } catch (error) {
+                console.error("Gagal memuat status follow:", error);
+            }
+        }
+        loadFollowing();
+        return () => {
+            cancelled = true;
         };
     }, []);
 
@@ -79,6 +163,7 @@ export default function ExplorePage() {
             const data = await res.json();
             setNews(data.news);
             setTrending(data.trending);
+            setPosts(data.posts ?? []);
             setAccounts(data.accounts);
             }
         } finally {
@@ -111,22 +196,34 @@ export default function ExplorePage() {
     const byCategory = <T extends { category: string }>(list: T[]) =>
         tab === "Explore" || tab === "Trending" ? list : list.filter((i) => i.category === tab);
 
+    const searching = query.trim().length > 0;
+    const compact = tab === "Explore" && !searching;
+
     const shownNews = tab === "Trending" ? [] : byCategory(news);
     const allTrending = byCategory(trending);
-    const shownTrending = tab === "Explore" && !query.trim() ? allTrending.slice(0, 5) : allTrending;
-    const searching = query.trim().length > 0;
+    const shownTrending = compact ? allTrending.slice(0, 5) : allTrending;
+    const allPosts = tab === "Trending" ? [] : (byCategory(posts ?? []) ?? []);
+    const shownPosts = compact ? allPosts.slice(0, 5) : allPosts;
+    const showAccounts = (tab === "Explore" || searching) && accounts.length > 0;
+
     const nothing =
-        !loading && !shownNews.length && !shownTrending.length && !(searching && accounts.length);
+        !loading &&
+        !shownNews.length &&
+        !shownTrending.length &&
+        !shownPosts.length &&
+        !showAccounts;
 
     const section = (title: string, children: React.ReactNode) => (
-        <section className="mb-6">
+        <section className="mb-8">
         <h2 className="mb-3 text-xl font-bold">{title}</h2>
         {children}
         </section>
     );
 
     return (
-        <main className="mx-auto w-full max-w-4xl px-6 py-8">
+    <div className="bg-dot-canvas min-h-dvh text-slate-900">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <main className="glass-panel overflow-hidden rounded-2xl p-5">
         <div className="relative mb-4 flex items-center gap-4">
             <Link href="/home" aria-label="Kembali" className="text-2xl">
             ←
@@ -138,7 +235,7 @@ export default function ExplorePage() {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 onKeyDown={(e) => e.key === "Enter" && saveSearch(query)}
-                placeholder="Cari topik, akun, atau berita"
+                placeholder="Cari topik, akun, atau postingan"
                 className="w-full rounded-full bg-gray-100 px-5 py-3 text-base outline-none focus:bg-white focus:ring-2 focus:ring-pink-400"
             />
 
@@ -223,12 +320,15 @@ export default function ExplorePage() {
                     <li key={t.id} className="flex gap-4 border-b border-gray-100 pb-3">
                         <span className="w-5 text-sm text-gray-500">{i + 1}</span>
                         <div>
-                        <p className="text-sm text-gray-500">
-                            {t.category} · Trending di Indonesia
-                        </p>
-                        <p className="text-base font-bold">
+                        <p className="text-sm text-gray-500">{t.category} · Trending di Indonesia</p>
+                        <button type="button"
+                            onClick={() => {
+                                setQuery(t.name);
+                                setTab("Explore");
+                            }}
+                            className="text-left text-base font-bold hover:text-pink-600">
                             <Highlight text={t.name} query={query} />
-                        </p>
+                        </button>
                         <p className="text-sm text-gray-500">{formatCount(t.postCount)}</p>
                         </div>
                     </li>
@@ -236,22 +336,64 @@ export default function ExplorePage() {
                 </ol>
                 )}
 
-            {searching &&
-                accounts.length > 0 &&
+            {showAccounts &&
                 section(
                 "Akun untuk diikuti",
                 <ul className="space-y-3">
                     {accounts.map((a) => (
                     <li key={a.id} className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-700">
-                        {(a.name ?? a.username).charAt(0).toUpperCase()}
+                        <Avatar name={a.name ?? a.username} />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-base font-bold">
+                                <Highlight text={a.name ?? a.username} query={query} />
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                @<Highlight text={a.username} query={query} />
+                            </p>
                         </div>
-                        <div>
-                        <p className="text-base font-bold">
-                            <Highlight text={a.name ?? a.username} query={query} />
-                        </p>
+                        <button
+                            type="button"
+                            onClick={() => toggleFollow(a.id)}
+                            disabled={!!followLoading[a.id]}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                following[a.id]
+                                    ? "border border-gray-300 bg-white text-gray-700"
+                                    : "bg-pink-600 text-white hover:bg-pink-700"
+                            } disabled:opacity-50`}
+                        >
+                            {followLoading[a.id]
+                                ? "Memproses..."
+                                : following[a.id]
+                                    ? "Following"
+                                    : "Follow"}
+                        </button>
+                    </li>
+                    ))}
+                </ul>
+                )}
+
+            {shownPosts.length > 0 &&
+                section(
+                "Postingan populer",
+                <ul className="space-y-4">
+                    {shownPosts.map((p) => (
+                    <li key={p.id} className="flex gap-3 border-b border-gray-100 pb-4">
+                        <Avatar name={p.author.name ?? p.author.username} />
+                        <div className="min-w-0">
                         <p className="text-sm text-gray-500">
-                            @<Highlight text={a.username} query={query} />
+                            <span className="text-base font-bold text-gray-900">
+                            <Highlight text={p.author.name ?? p.author.username} query={query} />
+                            </span>{" "}
+                            @{p.author.username} · {timeAgo(p.createdAt)} ·{" "}
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                            {p.category}
+                            </span>
+                        </p>
+                        <p className="mt-1 text-base">
+                            <Highlight text={p.content} query={query} />
+                        </p>
+                        <p className="mt-2 text-sm text-gray-500">
+                            💬 {p.replyCount} · ♡ {p.likeCount} · 📊 {p.views}
                         </p>
                         </div>
                     </li>
@@ -266,6 +408,9 @@ export default function ExplorePage() {
             )}
             </>
         )}
-        </main>
+    </main>
+    <ExploreSidebar/>
+    </div>
+    </div>
     );
 }

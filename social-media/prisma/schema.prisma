@@ -25,6 +25,7 @@ model User {
   mutedAccounts   MutedAccount[]
   blockedAccounts BlockedAccount[]
   searchHistory   SearchHistory[]
+  explorePosts ExplorePost[]
 
   // NOTIFICATION
   receivedNotifications Notification[] @relation("ReceivedNotifications")
@@ -199,9 +200,9 @@ model Article {
   authorId      String
   title         String
   content       String
-  coverImageUrl String?
   category      String            @default("Technology")
   views         Int               @default(0)
+  coverImageUrl String?
   status        String            @default("published")
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -314,7 +315,7 @@ model News {
   id        String   @id @default(cuid())
   title     String
   summary   String
-  category  String // News | Sports | Entertainment
+  category  String
   postCount Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -324,7 +325,7 @@ model News {
 model TrendingTopic {
   id        String @id @default(cuid())
   name      String @unique
-  category  String // News | Sports | Entertainment
+  category  String
   postCount Int    @default(0)
 
   @@index([category, postCount])
@@ -422,4 +423,20 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model ExplorePost {
+  id         String   @id @default(cuid())
+  content    String
+  category   String
+  replyCount Int      @default(0)
+  likeCount  Int      @default(0)
+  views      Int      @default(0)
+  authorId   String
+  createdAt  DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([category, likeCount])
+  @@index([authorId])
 }
