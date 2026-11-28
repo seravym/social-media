@@ -42,6 +42,7 @@ export default function ProfilePage() {
             className="banner-img"
             />
             </section>
+        
 
         <section className="profile-information">
           <div className="profile-top-row">
@@ -65,15 +66,17 @@ export default function ProfilePage() {
             </div>
 
             <div className="profile-actions">
-              <button type="button" onClick={() => setIsEditOpen(true)}>Edit Profile</button>
+              <button type="button" onClick={openEditModal}
+                >Edit Profile</button>
               <button type="button">Share</button>
             </div>
           </div>
 
           <div className="profile-details">
-            <h2>Nama Akun</h2>
-            <p>@username</p>
-            <p>bergabung sejak 2026</p>
+            <h2>{displayName}</h2>
+            <p className ="profile-handle">{username}</p>
+            {bio && <p className="profile-bio">{bio}</p>}
+            <p className="profile-joined">bergabung sejak 2026</p>
           </div>
         </section>
 
@@ -136,9 +139,7 @@ export default function ProfilePage() {
                 onClick={() => setIsEditOpen(false)}
                 > X </button>
             </div>
-        </div>
-    </div>
-)}
+    
 
 <div className = "edit-banner-box">
     <img
@@ -168,27 +169,38 @@ export default function ProfilePage() {
 
         <div className = "edit-form-col">
             <label className = "edit-label">Nama Akun</label>
-            <input type = "text" className="edit-input"/>
-            <label className = "edit-label">Nama Akun</label>
-            <input type = "text" className="edit-input"/>
-            <label className = "edit-label">Nama Akun</label>
+            <input type = "text" 
+            className="edit-input" 
+            value= {draftName}
+             onChange={(e) => setDraftName(e.target.value)}
+            />
+            <label className = "edit-label">Id Akun</label>
+             <input type = "text" 
+            className="edit-input" 
+            value= {draftUsername}
+             onChange={(e) => setDraftUsername(e.target.value)}
+            />
+            <label className = "edit-label">Bio</label>
             <textarea
             maxLength={35}
             placeholder = "Maksimal 35 huruf"
             className = "edit-textarea"
+            value ={draftBio}
+            onChange={(e) => setDraftBio(e.target.value)}
             />
-            <span className="edit-bio-counter"> 0/35</span>
+            <span className="edit-bio-counter">{draftBio.length}/35</span>
             <button
             type = "button"
             className = "edit-save-btn"
-            onClick={() => setIsEditOpen(false)}
+            onClick={handleSave}
             >
                 ✿ Save ✿
-            </button>
+        </button>
+            </div>
+          </div>
         </div>
-
-    </div>
-
+      </div>
+      )}
     </div>
   );
 }

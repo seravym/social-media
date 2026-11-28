@@ -96,6 +96,7 @@ display:flex;
   flex-direction: column;
   gap: 10px;
   padding-top: 14px;
+  position: relative
 }
 
 .profile-actions button {
@@ -160,6 +161,7 @@ display:flex;
 .profile-navigation div.active {
   font-weight: 800;
 }
+
 
 .profile-navigation div.active::after {
   content: "";
