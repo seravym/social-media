@@ -9,11 +9,28 @@ export default function ProfilePage() {
     const [username, setUsername] = useState("@username");
     const [bio,setBio] = useState ("")
 
-const [draftName, setDraftName] = useState(displayName);
+    const [draftName, setDraftName] = useState(displayName);
   const [draftUsername, setDraftUsername] = useState(username);
   const [draftBio, setDraftBio] = useState(bio);
 
+    const openEditModal = () => {
+        setDraftName (displayName);
+        setDraftUsername(username);
+        setDraftBio(bio);
+        setIsEditOpen(true);
+    };
 
+    const handleSave = () => {
+        const cleanName = draftName.trim() || "Nama Akun";
+        const rawHandle = draftUsername.trim() || "@username";
+        const cleanHandle = rawHandle.startsWith("@") ? rawHandle : `@${rawHandle}`;  
+      
+
+      setDisplayName(cleanName);
+      setUsername(cleanHandle);
+      setBio(draftBio.slice(0, 50));
+      setIsEditOpen(false);
+    };
 
   return (
     <div className="profile-layout">
