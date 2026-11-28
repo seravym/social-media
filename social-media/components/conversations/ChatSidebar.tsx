@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import type { ConversationDto, UserCard } from "@/lib/types";
 import { ChatListSkeleton } from "@/components/conversations/ChatSkeletons";
 import { VibeNotesBar } from "@/components/conversations/VibeNotesBar";
@@ -160,29 +159,35 @@ export function ChatSidebar({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setGroupError(null);
-              setGroupModalOpen(true);
-            }}
-            className="rounded-lg bg-[#b85c7a] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
+        <button
+          type="button"
+          onClick={() => {
+            setGroupError(null);
+            setGroupModalOpen(true);
+          }}
+          className="glass-chip inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-[#9e4865] transition hover:bg-white/90 hover:text-[#7f364e] active:scale-[0.98]"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            + Grup
-          </button>
-          <Link
-            href="/home"
-            className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-white/70 hover:text-slate-800"
-          >
-            Home
-          </Link>
-        </div>
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+          <span>Grup</span>
+        </button>
       </div>
 
       <VibeNotesBar conversations={conversations} onReplyNote={onReplyNote} />
 
-      <div className="space-y-2.5 border-b border-white/70 px-3 py-3">
+      <div className="border-b border-white/70 px-3 pt-3">
         <div className="relative">
           <input
             type="text"
@@ -212,7 +217,7 @@ export function ChatSidebar({
         </div>
 
         {search.trim().length > 0 ? (
-          <div className="max-h-48 overflow-y-auto rounded-xl border border-white/85 bg-white/90 p-1.5 shadow-sm backdrop-blur-md">
+          <div className="my-2.5 max-h-48 overflow-y-auto rounded-xl border border-white/85 bg-white/90 p-1.5 shadow-sm backdrop-blur-md">
             {searching ? (
               <p className="px-3 py-2 text-xs text-slate-400">
                 Mencari user...
@@ -259,7 +264,7 @@ export function ChatSidebar({
             )}
           </div>
         ) : (
-          <div className="flex gap-1.5">
+          <div className="mt-2 flex gap-4 px-1">
             {(
               [
                 { key: "all", label: "Semua" },
@@ -271,10 +276,10 @@ export function ChatSidebar({
                 key={item.key}
                 type="button"
                 onClick={() => setTab(item.key)}
-                className={`flex-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                className={`border-b-2 pb-2 text-xs font-medium transition ${
                   tab === item.key
-                    ? "bg-[#b85c7a] text-white shadow-xs"
-                    : "glass-chip text-slate-600 hover:bg-white/85"
+                    ? "border-[#b85c7a] font-semibold text-[#b85c7a]"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
                 {item.label}
@@ -288,13 +293,13 @@ export function ChatSidebar({
         <button
           type="button"
           onClick={() => onSelectChat("self-notes")}
-          className={`mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+          className={`mb-1.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
             selectedId === "self-notes"
-              ? "border border-[#b85c7a]/35 bg-[#faf0f3]/80"
-              : "glass-chip hover:bg-white/80"
+              ? "bg-white/80 shadow-xs"
+              : "hover:bg-white/50"
           }`}
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#b85c7a] text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#faf0f3] text-[#b85c7a] ring-1 ring-[#b85c7a]/20">
             <svg
               className="h-4 w-4"
               viewBox="0 0 24 24"
@@ -307,14 +312,9 @@ export function ChatSidebar({
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="truncate text-sm font-semibold text-slate-900">
-                Catatan Pribadi
-              </p>
-              <span className="rounded-md bg-[#faf0f3] px-1.5 py-0.5 text-[10px] font-medium text-[#9e4865]">
-                Anda
-              </span>
-            </div>
+            <p className="truncate text-sm font-semibold text-slate-900">
+              Catatan Pribadi
+            </p>
             <p className="truncate text-xs text-slate-500">Draf Anda</p>
           </div>
         </button>
@@ -367,7 +367,7 @@ export function ChatSidebar({
                   }}
                   className={`group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition ${
                     isActive
-                      ? "border border-white/85 bg-white/75 shadow-xs"
+                      ? "bg-white/80 shadow-xs"
                       : "hover:bg-white/50"
                   }`}
                 >
@@ -392,8 +392,8 @@ export function ChatSidebar({
                         {name}
                       </p>
                       {isGroup && (
-                        <span className="rounded-md bg-[#faf0f3] px-1.5 py-0.5 text-[10px] font-medium text-[#9e4865]">
-                          Grup
+                        <span className="text-[11px] font-medium text-slate-400">
+                          · Grup
                         </span>
                       )}
                       {isPinned && (
@@ -506,7 +506,7 @@ export function ChatSidebar({
                       key={m.id}
                       type="button"
                       onClick={() => toggleMember(m)}
-                      className="rounded-full bg-[#faf0f3] px-2.5 py-1 text-[11px] font-medium text-[#9e4865]"
+                      className="rounded-lg bg-[#faf0f3] px-2.5 py-1 text-[11px] font-medium text-[#9e4865]"
                     >
                       {m.displayName} ✕
                     </button>

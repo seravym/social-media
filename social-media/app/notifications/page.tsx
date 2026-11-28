@@ -3,18 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Bell,
-  Check,
-  Compass,
-  Home,
-  MessageSquare,
-  Settings,
-  TrendingUp,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { Bell, Check, SlidersHorizontal, X } from "lucide-react";
 import type { NotificationDto } from "@/lib/types";
 import {
   groupNotifications,
@@ -49,7 +38,7 @@ const HIDDEN_KEY = "social_media_hidden_notifs_v1";
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "Semua" },
-  { key: "unread", label: "Belum Dibaca" },
+  { key: "unread", label: "Belum dibaca" },
   { key: "like", label: "Suka" },
   { key: "follow", label: "Pengikut" },
   { key: "reply", label: "Balasan" },
@@ -74,6 +63,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastItem | null>(null);
+  const [toastEnabled, setToastEnabled] = useState(true);
 
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
@@ -102,7 +92,7 @@ export default function NotificationsPage() {
           const brandNew = incoming.filter(
             (n) => !seenIdsRef.current.has(n.id) && !n.isRead,
           );
-          if (brandNew.length > 0) {
+          if (brandNew.length > 0 && toastEnabled) {
             const latest = brandNew[0];
             const action =
               NOTIFICATION_ACTION_TEXT[latest.type] ??
@@ -135,8 +125,23 @@ export default function NotificationsPage() {
         if (!isPoll) setLoading(false);
       }
     },
-    [showToast],
+    [showToast, toastEnabled],
   );
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/settings", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (alive && data && typeof data.notifyToast === "boolean") {
+          setToastEnabled(data.notifyToast);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     void fetchNotifications(false);
@@ -250,79 +255,25 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="bg-dot-canvas min-h-dvh text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-white/75 bg-white/75 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
-          <Link
-            href="/home"
-            className="text-sm font-bold tracking-tight text-slate-900"
-          >
-            Social
-          </Link>
+    <div className="bg-dot-canvas min-h-[calc(100dvh-4rem)] text-slate-900">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="glass-panel min-w-0 overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-3">
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900">
+                Notifikasi
+              </h1>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Aktivitas terbaru dari postingan dan pengikutmu
+              </p>
+            </div>
 
-          <nav className="flex items-center gap-1 overflow-x-auto text-xs font-medium">
-            <Link
-              href="/home"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
-            >
-              <Home className="h-3.5 w-3.5" />
-              Beranda
-            </Link>
-            <Link
-              href="/explore"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
-            >
-              <Compass className="h-3.5 w-3.5" />
-              Jelajahi
-            </Link>
-            <Link
-              href="/conversations"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Pesan
-            </Link>
-            <Link
-              href="/notifications"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#faf0f3] px-3 py-1.5 font-semibold text-[#9e4865]"
-            >
-              <Bell className="h-3.5 w-3.5 text-[#b85c7a]" />
-              Notifikasi
-              {unreadCount > 0 && (
-                <span className="rounded-full bg-[#b85c7a] px-1.5 text-[10px] font-bold text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="/communities"
-              className="hidden shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900 sm:flex"
-            >
-              <Users className="h-3.5 w-3.5" />
-              Komunitas
-            </Link>
-          </nav>
-
-          <Link
-            href="/settings"
-            aria-label="Pengaturan"
-            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100/80 hover:text-slate-900"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
-        </div>
-      </header>
-
-      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-3 py-5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main className="glass-panel overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2">
-            <h1 className="text-base font-bold text-slate-900">Notifikasi</h1>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-2">
               {hiddenIds.length > 0 && (
                 <button
                   type="button"
                   onClick={() => persistHidden([])}
-                  className="font-medium text-slate-500 transition hover:text-[#b85c7a]"
+                  className="glass-chip rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-white/85 hover:text-slate-900"
                 >
                   Tampilkan ({hiddenIds.length})
                 </button>
@@ -331,16 +282,24 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
-                  className="inline-flex items-center gap-1 font-semibold text-[#b85c7a] transition hover:text-[#9e4865]"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf0f3]/90 px-3 py-1.5 text-xs font-semibold text-[#9e4865] transition hover:bg-[#f4e2e8]"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Tandai dibaca
                 </button>
               )}
+              <Link
+                href="/settings/notifications"
+                title="Preferensi notifikasi"
+                className="glass-chip inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white/85 hover:text-slate-900"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Atur</span>
+              </Link>
             </div>
           </div>
 
-          <div className="flex gap-5 overflow-x-auto border-b border-white/75 px-5">
+          <div className="flex gap-1.5 overflow-x-auto border-b border-white/75 px-5 pb-3">
             {FILTER_TABS.map(({ key, label }) => {
               const active = tab === key;
               return (
@@ -348,56 +307,70 @@ export default function NotificationsPage() {
                   key={key}
                   type="button"
                   onClick={() => setTab(key)}
-                  className={`shrink-0 border-b-2 py-2.5 text-xs font-medium transition ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     active
-                      ? "border-[#b85c7a] font-semibold text-[#9e4865]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
+                      ? "bg-[#faf0f3]/95 font-semibold text-[#9e4865] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+                      : "text-slate-600 hover:bg-white/60 hover:text-slate-900"
                   }`}
                 >
                   {label}
+                  {key === "unread" && unreadCount > 0 && (
+                    <span className="rounded-full bg-[#b85c7a] px-1.5 text-[10px] font-bold text-white">
+                      {unreadCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
           {loading ? (
-            <div className="divide-y divide-white/60">
+            <div className="divide-y divide-white/65 px-5">
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="flex animate-pulse items-center gap-3.5 px-5 py-4"
+                  className="flex animate-pulse items-center gap-3.5 py-4"
                 >
-                  <div className="h-10 w-10 rounded-lg bg-slate-200/80" />
+                  <div className="h-10 w-10 rounded-full bg-white/70" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3.5 w-2/3 rounded bg-slate-200/80" />
-                    <div className="h-3 w-1/3 rounded bg-slate-200/60" />
+                    <div className="h-3.5 w-2/3 rounded bg-white/70" />
+                    <div className="h-3 w-1/3 rounded bg-white/50" />
                   </div>
                 </div>
               ))}
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-              <p className="text-sm text-slate-600">{error}</p>
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <p className="text-sm font-medium text-slate-700">{error}</p>
               <button
                 type="button"
                 onClick={() => {
                   setLoading(true);
                   void fetchNotifications(false);
                 }}
-                className="rounded-lg bg-[#b85c7a] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
+                className="mt-3 rounded-lg bg-[#b85c7a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#9e4865]"
               >
                 Coba lagi
               </button>
             </div>
           ) : grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <Bell className="mb-2.5 h-6 w-6 text-slate-300" />
-              <p className="text-sm font-semibold text-slate-700">
+              <div className="glass-chip mb-3 flex h-11 w-11 items-center justify-center rounded-full text-[#b85c7a]">
+                <Bell className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-semibold text-slate-900">
                 Belum ada notifikasi
               </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Suka, pengikut baru, dan balasan akan muncul di sini.
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
+                Suka, komentar, dan pengikut baru akan muncul di sini saat ada
+                interaksi di akunmu.
               </p>
+              <Link
+                href="/explore"
+                className="glass-chip mt-4 inline-flex items-center rounded-lg px-3.5 py-1.5 text-xs font-semibold text-[#9e4865] transition hover:bg-white/85"
+              >
+                Jelajahi postingan
+              </Link>
             </div>
           ) : (
             <ul className="divide-y divide-white/65">
@@ -415,35 +388,32 @@ export default function NotificationsPage() {
         </main>
 
         <aside className="hidden lg:block">
-          <div className="sticky top-16 space-y-4">
-            <div className="glass-panel overflow-hidden rounded-2xl">
-              <div className="flex items-center justify-between border-b border-white/75 px-4 py-3">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-[#b85c7a]" />
-                  <h2 className="text-xs font-semibold text-slate-900">
-                    Trending
-                  </h2>
-                </div>
+          <div className="sticky top-20 space-y-4">
+            <section className="glass-panel overflow-hidden rounded-2xl">
+              <div className="flex items-center justify-between border-b border-white/75 px-4 py-3.5">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Trending
+                </h2>
                 <Link
                   href="/explore"
-                  className="text-[11px] font-medium text-[#b85c7a] transition hover:text-[#9e4865]"
+                  className="text-xs font-medium text-[#b85c7a] transition hover:text-[#9e4865]"
                 >
                   Lihat semua
                 </Link>
               </div>
 
               {exploreLoading ? (
-                <div className="divide-y divide-white/60">
+                <div className="space-y-3 p-4">
                   {[0, 1, 2].map((i) => (
-                    <div key={i} className="animate-pulse space-y-1.5 px-4 py-3">
-                      <div className="h-3 w-2/3 rounded bg-slate-200/80" />
-                      <div className="h-2.5 w-1/3 rounded bg-slate-200/60" />
+                    <div key={i} className="animate-pulse space-y-1.5">
+                      <div className="h-3 w-2/3 rounded bg-white/70" />
+                      <div className="h-2.5 w-1/3 rounded bg-white/50" />
                     </div>
                   ))}
                 </div>
               ) : trending.length === 0 ? (
-                <p className="px-4 py-5 text-center text-xs text-slate-400">
-                  Belum ada topik trending.
+                <p className="px-4 py-6 text-center text-xs text-slate-500">
+                  Belum ada topik trending saat ini.
                 </p>
               ) : (
                 <ul className="divide-y divide-white/65">
@@ -451,12 +421,12 @@ export default function NotificationsPage() {
                     <li key={topic.id}>
                       <Link
                         href={`/explore?q=${encodeURIComponent(topic.name)}`}
-                        className="block px-4 py-3 transition hover:bg-white/60"
+                        className="block px-4 py-3 transition hover:bg-white/55"
                       >
-                        <p className="truncate text-xs font-semibold text-slate-800">
+                        <p className="truncate text-sm font-medium text-slate-900">
                           {topic.name}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-slate-400">
+                        <p className="mt-0.5 text-xs text-slate-500">
                           {topic.category ? `${topic.category} · ` : ""}
                           {topic.postCount} postingan
                         </p>
@@ -465,13 +435,12 @@ export default function NotificationsPage() {
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
 
             {accounts.length > 0 && (
-              <div className="glass-panel overflow-hidden rounded-2xl">
-                <div className="flex items-center gap-1.5 border-b border-white/75 px-4 py-3">
-                  <UserPlus className="h-3.5 w-3.5 text-[#b85c7a]" />
-                  <h2 className="text-xs font-semibold text-slate-900">
+              <section className="glass-panel overflow-hidden rounded-2xl">
+                <div className="border-b border-white/75 px-4 py-3.5">
+                  <h2 className="text-sm font-semibold text-slate-900">
                     Mungkin kamu kenal
                   </h2>
                 </div>
@@ -482,16 +451,16 @@ export default function NotificationsPage() {
                       <li key={acc.id}>
                         <Link
                           href={`/profile/${acc.id}`}
-                          className="flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-white/60"
+                          className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/55"
                         >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#faf0f3] text-xs font-semibold text-[#b85c7a]">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#faf0f3] text-xs font-semibold text-[#9e4865]">
                             {display.charAt(0).toUpperCase()}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold text-slate-800">
+                            <p className="truncate text-sm font-medium text-slate-900">
                               {display}
                             </p>
-                            <p className="truncate text-[11px] text-slate-400">
+                            <p className="truncate text-xs text-slate-500">
                               @{acc.username}
                             </p>
                           </div>
@@ -500,7 +469,7 @@ export default function NotificationsPage() {
                     );
                   })}
                 </ul>
-              </div>
+              </section>
             )}
           </div>
         </aside>
@@ -508,18 +477,18 @@ export default function NotificationsPage() {
 
       {toast && (
         <div className="fixed right-4 bottom-4 z-50 w-full max-w-xs">
-          <div className="glass-panel flex items-center justify-between gap-3 rounded-xl border border-white/85 px-3.5 py-2.5 shadow-lg">
+          <div className="glass-panel flex items-center justify-between gap-3 rounded-xl px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-xs font-semibold text-slate-900">
                 {toast.title}
               </p>
               {toast.subtitle && (
-                <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                <p className="mt-0.5 truncate text-xs text-slate-500">
                   {toast.subtitle}
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-2">
               {toast.undoIds && (
                 <button
                   type="button"
@@ -533,7 +502,7 @@ export default function NotificationsPage() {
                 type="button"
                 onClick={() => setToast(null)}
                 aria-label="Tutup"
-                className="rounded p-1 text-slate-400 hover:bg-white/80 hover:text-slate-700"
+                className="rounded p-1 text-slate-400 hover:bg-white/70 hover:text-slate-700"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

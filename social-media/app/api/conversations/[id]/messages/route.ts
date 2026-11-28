@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authed, json } from "@/lib/route";
-import type { ChatMessageDto } from "@/lib/types";
+import { messageInclude, toMessageDto } from "@/lib/chat";
 import { checkDirectMessagePermission } from "@/lib/messaging-privacy";
 
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -9,28 +9,6 @@ const HTTP_URL_RE = /^https?:\/\/.+/i;
 
 function isValidImageUrl(value: string): boolean {
   return IMAGE_DATA_URL_RE.test(value) || HTTP_URL_RE.test(value);
-}
-
-function toMessageDto(message: {
-  id: string;
-  senderId: string;
-  body: string;
-  imageUrl: string | null;
-  isForwarded: boolean;
-  editedAt: Date | null;
-  deletedAt: Date | null;
-  createdAt: Date;
-}): ChatMessageDto {
-  return {
-    id: message.id,
-    senderId: message.senderId,
-    body: message.body,
-    imageUrl: message.imageUrl,
-    isForwarded: message.isForwarded,
-    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
-    deletedAt: message.deletedAt ? message.deletedAt.toISOString() : null,
-    createdAt: message.createdAt.toISOString(),
-  };
 }
 
 const messageSchema = z
@@ -46,6 +24,7 @@ const messageSchema = z
       .nullable()
       .optional(),
     isForwarded: z.boolean().optional(),
+    replyToId: z.string().trim().min(1).max(100).nullable().optional(),
   })
   .refine(
     (data) => data.body.length > 0 || Boolean(data.imageUrl && data.imageUrl.length > 0),
@@ -84,13 +63,14 @@ export const GET = authed<{ params: Promise<{ id: string }> }>(
           conversationId: id,
           createdAt: { gt: threshold },
         },
+        include: messageInclude,
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         take: limit,
       });
 
       return json({
         currentUserId: user.id,
-        messages: messages.map(toMessageDto),
+        messages: messages.map((message) => toMessageDto(message, user.id)),
         hasMore: messages.length === limit,
       });
     }
@@ -111,6 +91,7 @@ export const GET = authed<{ params: Promise<{ id: string }> }>(
         conversationId: id,
         ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
       },
+      include: messageInclude,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -121,7 +102,7 @@ export const GET = authed<{ params: Promise<{ id: string }> }>(
 
     return json({
       currentUserId: user.id,
-      messages: page.map(toMessageDto),
+      messages: page.map((message) => toMessageDto(message, user.id)),
       hasMore,
     });
   }
@@ -182,6 +163,17 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
         ? parsed.data.imageUrl
         : null;
 
+    const replyToId = parsed.data.replyToId ?? null;
+    if (replyToId) {
+      const replyTarget = await prisma.message.findFirst({
+        where: { id: replyToId, conversationId: id, deletedAt: null },
+        select: { id: true },
+      });
+      if (!replyTarget) {
+        return json({ error: "Pesan yang dibalas tidak ditemukan." }, 400);
+      }
+    }
+
     const now = new Date();
     const [message] = await prisma.$transaction([
       prisma.message.create({
@@ -191,7 +183,9 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
           body: parsed.data.body,
           imageUrl: normalizedImageUrl,
           isForwarded: parsed.data.isForwarded ?? false,
+          replyToId,
         },
+        include: messageInclude,
       }),
       prisma.conversation.update({
         where: { id },
@@ -207,6 +201,6 @@ export const POST = authed<{ params: Promise<{ id: string }> }>(
       }),
     ]);
 
-    return json(toMessageDto(message), 201);
+    return json(toMessageDto(message, user.id), 201);
   }
 );

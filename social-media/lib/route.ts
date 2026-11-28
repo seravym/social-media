@@ -8,6 +8,20 @@ type AuthedUser = { id: string };
 
 const LEGACY_DEV_USER_ID = "cmw9dzn1h00004okr31yn29tn";
 
+/**
+ * Resolves the acting user from the session cookie. In development only, a
+ * client supplied id is accepted so the seeded/mock flow keeps working.
+ * In production the body id is ignored to prevent impersonation.
+ */
+export async function resolveUserId(
+  bodyUserId?: string | null,
+): Promise<string | null> {
+  const sessionId = await getSessionUserId();
+  if (sessionId) return sessionId;
+  if (process.env.NODE_ENV !== "production") return bodyUserId ?? null;
+  return null;
+}
+
 export function authed<C = unknown>(
   fn: (user: AuthedUser, req: Request, ctx: C) => Promise<Response>
 ) {

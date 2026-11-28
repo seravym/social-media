@@ -1,25 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { resolveUserId } from "@/lib/route";
+import {
+  getModerationFilters,
+  isMutedAuthor,
+  isMutedContent,
+} from "@/lib/moderation";
+import type { Prisma } from "@/generated/client";
 
 export async function GET(request: NextRequest) {
   try {
     const tab = request.nextUrl.searchParams.get("tab") || "foryou";
     const currentUserId = await getSessionUserId();
+    const filters = await getModerationFilters(currentUserId);
 
-    let whereClause = {};
+    let followingIds: string[] = [];
+    if (currentUserId) {
+      const follows = await prisma.follow.findMany({
+        where: { followerId: currentUserId },
+        select: { followingId: true },
+      });
+      followingIds = follows.map((f) => f.followingId);
+    }
+    const followingSet = new Set(followingIds);
+
+    let whereClause: Prisma.PostWhereInput = {};
 
     if (tab === "following") {
       if (!currentUserId) {
         return NextResponse.json({ posts: [] });
       }
-
-      const follows = await prisma.follow.findMany({
-        where: { followerId: currentUserId },
-        select: { followingId: true },
-      });
-
-      const followingIds = follows.map((f) => f.followingId);
 
       whereClause = {
         authorId: { in: followingIds },
@@ -35,6 +46,7 @@ export async function GET(request: NextRequest) {
             name: true,
             username: true,
             avatarUrl: true,
+            settings: { select: { protectPosts: true } },
           },
         },
         _count: {
@@ -55,28 +67,39 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const visiblePosts = posts.filter((post) => {
+      if (isMutedAuthor(post.author.username, filters)) return false;
+      if (isMutedContent(post.content, filters.words)) return false;
+      if (!post.author.settings?.protectPosts) return true;
+      if (currentUserId && post.authorId === currentUserId) return true;
+      return Boolean(currentUserId && followingSet.has(post.authorId));
+    });
+
     let bookmarkedIds = new Set<string>();
 
-    if (currentUserId && posts.length > 0) {
+    if (currentUserId && visiblePosts.length > 0) {
       const bookmarks = await prisma.bookmark.findMany({
         where: {
           userId: currentUserId,
-          postId: { in: posts.map((p) => p.id) },
+          postId: { in: visiblePosts.map((p) => p.id) },
         },
         select: { postId: true },
       });
 
-      bookmarkedIds = new Set(
-        bookmarks.map((b) => b.postId)
-      );
+      bookmarkedIds = new Set(bookmarks.map((b) => b.postId));
     }
 
-    const formatted = posts.map((p) => ({
+    const formatted = visiblePosts.map((p) => ({
       id: p.id,
       content: p.content,
       views: p.views,
       createdAt: p.createdAt,
-      author: p.author,
+      author: {
+        id: p.author.id,
+        name: p.author.name,
+        username: p.author.username,
+        avatarUrl: p.author.avatarUrl,
+      },
       repliesCount: p._count.comments,
       likesCount: p._count.likes,
       isLiked: Array.isArray(p.likes) && p.likes.length > 0,
@@ -89,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Gagal mengambil postingan" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -99,7 +122,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const content = body.content ?? body.message;
-    const userId = (await getSessionUserId()) || body.userId;
+    const userId = await resolveUserId(body.userId);
 
     const communityId =
       body.communityId !== undefined &&
@@ -111,25 +134,22 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json(
         { error: "Silakan login terlebih dahulu" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     if (!content || typeof content !== "string" || !content.trim()) {
       return NextResponse.json(
         { error: "Isi postingan tidak boleh kosong" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (communityId !== null) {
-      if (
-        !Number.isInteger(communityId) ||
-        communityId <= 0
-      ) {
+      if (!Number.isInteger(communityId) || communityId <= 0) {
         return NextResponse.json(
           { error: "Community ID tidak valid" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -140,7 +160,7 @@ export async function POST(request: NextRequest) {
       if (!community) {
         return NextResponse.json(
           { error: "Community tidak ditemukan" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -156,7 +176,7 @@ export async function POST(request: NextRequest) {
       if (!membership) {
         return NextResponse.json(
           { error: "Join community terlebih dahulu untuk membuat post" },
-          { status: 403 }
+          { status: 403 },
         );
       }
     }
@@ -165,9 +185,7 @@ export async function POST(request: NextRequest) {
       data: {
         content: content.trim(),
         authorId: userId,
-        ...(communityId !== null
-          ? { communityId }
-          : {}),
+        ...(communityId !== null ? { communityId } : {}),
       },
       include: {
         author: {
@@ -197,14 +215,14 @@ export async function POST(request: NextRequest) {
           communityId: newPost.communityId,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("POST /api/posts error:", error);
 
     return NextResponse.json(
       { error: "Gagal membuat postingan" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
