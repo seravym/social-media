@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { applyDisplay, type DisplaySettings } from "@/components/ApplyDisplay";
+import type { ReactNode } from "react";
+import SettingsPageLayout from "@/components/settings/SettingsPageLayout";
+import { applyDisplay, type DisplaySettings,} from "@/components/ApplyDisplay";
 import { LANGUAGES, t } from "@/lib/i18n";
 
-const DEFAULTS: DisplaySettings = { theme: "light", fontSize: "medium", language: "id" };
+const DEFAULTS: DisplaySettings = {
+    theme: "light",
+    fontSize: "medium",
+    language: "id",
+};
 
 export default function DisplaySettingsPage() {
     const [s, setS] = useState<DisplaySettings>(DEFAULTS);
@@ -18,7 +23,11 @@ export default function DisplaySettingsPage() {
             const res = await fetch("/api/settings");
             if (res.ok) {
             const data = await res.json();
-            setS({ theme: data.theme, fontSize: data.fontSize, language: data.language });
+            setS({
+                theme: data.theme,
+                fontSize: data.fontSize,
+                language: data.language,
+            });
             }
         } finally {
             setLoading(false);
@@ -43,7 +52,6 @@ export default function DisplaySettingsPage() {
     }
 
     const lang = s.language;
-
     const radio = (
         name: keyof DisplaySettings,
         value: string,
@@ -51,41 +59,61 @@ export default function DisplaySettingsPage() {
     ) => (
         <label
         key={value}
-        className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-3 text-sm last:border-b-0"
+        className="flex cursor-pointer items-center gap-3 border-t border-white/60 px-4 py-3 text-sm text-slate-700 sm:px-5"
         >
         <input
             type="radio"
             name={name}
             checked={s[name] === value}
-            onChange={() => save({ ...s, [name]: value })}
-            className="accent-pink-600"
+            onChange={() =>
+            save({ ...s, [name]: value } as DisplaySettings)
+            }
+            className="accent-[#b85c7a]"
         />
         {label}
         </label>
     );
 
-    const card = (title: string, hint: string, children: React.ReactNode) => (
-        <section className="mb-4 overflow-hidden rounded-xl border border-gray-200">
-        <div className="px-4 pt-3">
-            <h2 className="text-sm font-bold">{title}</h2>
-            <p className="mb-2 text-xs text-gray-500">{hint}</p>
+    const card = (
+        title: string,
+        hint: string,
+        children: ReactNode
+    ) => (
+        <section className="border-b border-white/65 last:border-b-0">
+        <div className="px-4 pt-4 sm:px-5">
+            <h2 className="text-sm font-semibold text-slate-900">
+            {title}
+            </h2>
+            <p className="mb-3 mt-0.5 text-xs text-slate-500">
+            {hint}
+            </p>
         </div>
         {children}
         </section>
     );
 
     return (
-        <main className="mx-auto max-w-xl px-4 py-6">
-        <div className="mb-2 flex items-center gap-3">
-            <Link href="/settings" aria-label="Kembali" className="text-xl">
-            ←
-            </Link>
-            <h1 className="text-xl font-bold text-pink-600">{t(lang, "title")}</h1>
-        </div>
-        <p className="mb-4 text-sm text-gray-500">{t(lang, "subtitle")}</p>
-
+        <SettingsPageLayout
+        title={t(lang, "title")}
+        description={t(lang, "subtitle")}
+        status={
+            notice ? (
+            <span
+                className={`shrink-0 text-xs font-medium ${
+                notice === "failed"
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                }`}
+            >
+                {t(lang, notice)}
+            </span>
+            ) : undefined
+        }
+        >
         {loading ? (
-            <p className="py-8 text-center text-gray-500">...</p>
+            <p className="py-10 text-center text-sm text-slate-500">
+            Memuat...
+            </p>
         ) : (
             <>
             {card(
@@ -96,7 +124,6 @@ export default function DisplaySettingsPage() {
                 {radio("theme", "dark", t(lang, "dark"))}
                 </>
             )}
-
             {card(
                 t(lang, "fontSize"),
                 t(lang, "fontSizeHint"),
@@ -106,33 +133,43 @@ export default function DisplaySettingsPage() {
                 {radio("fontSize", "large", t(lang, "large"))}
                 </>
             )}
-
             {card(
                 t(lang, "language"),
                 t(lang, "languageHint"),
-                <>{LANGUAGES.map((l) => radio("language", l.code, l.label))}</>
+                <>
+                {LANGUAGES.map((l) =>
+                    radio("language", l.code, l.label)
+                )}
+                </>
             )}
-
-            <section className="mb-4 rounded-xl border border-gray-200 px-4 py-3">
-                <h2 className="text-sm font-bold">{t(lang, "preview")}</h2>
-                <p className="mt-1 text-sm">{t(lang, "previewText")}</p>
+            <section className="border-t border-white/65 px-4 py-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-slate-900">
+                {t(lang, "preview")}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                {t(lang, "previewText")}
+                </p>
             </section>
-
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/65 px-4 py-4 sm:px-5">
                 <span
-                className={`text-sm ${notice === "failed" ? "text-red-600" : "text-green-600"}`}
+                className={`text-xs font-medium ${
+                    notice === "failed"
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                }`}
                 >
                 {notice && t(lang, notice)}
                 </span>
                 <button
+                type="button"
                 onClick={() => save(DEFAULTS)}
-                className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold"
+                className="rounded-full border border-slate-200 bg-white/60 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
                 >
                 {t(lang, "reset")}
                 </button>
             </div>
             </>
         )}
-        </main>
+        </SettingsPageLayout>
     );
 }
