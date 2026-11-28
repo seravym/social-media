@@ -225,24 +225,19 @@ export default function ExplorePage() {
 
     const handleLikePost = async (postId: string) => {
         if (likeLoading[postId]) return;
-
         setLikeLoading((prev) => ({
             ...prev,
             [postId]: true,
         }));
-
         try {
             const res = await fetch(`/api/posts/${postId}/like`, {
                 method: "POST",
             });
-
             const data = await res.json();
-
             if (!res.ok) {
                 alert(data.error || "Gagal memproses like");
                 return;
             }
-
             setPosts((prev) =>
                 prev.map((post) =>
                     post.id === postId
@@ -277,7 +272,6 @@ export default function ExplorePage() {
             ...prev,
             [postId]: true,
         }));
-
         try {
             const res = await fetch(`/api/posts/${postId}/comments`, {
                 method: "POST",
@@ -286,24 +280,19 @@ export default function ExplorePage() {
                 },
                 body: JSON.stringify({ content }),
             });
-
             const data = await res.json();
-
             if (!res.ok) {
                 alert(data.error || "Gagal mengirim komentar");
                 return;
             }
-
             const comment: ExploreComment = {
                 id: data.comment?.id ?? `${postId}-${Date.now()}`,
                 content: data.comment?.content ?? content,
             };
-
             setNewComments((prev) => ({
                 ...prev,
                 [postId]: [comment, ...(prev[postId] ?? [])],
             }));
-
             setPosts((prev) =>
                 prev.map((post) =>
                     post.id === postId
@@ -317,7 +306,6 @@ export default function ExplorePage() {
                         : post
                 )
             );
-
             setCommentText((prev) => ({
                 ...prev,
                 [postId]: "",
@@ -417,8 +405,51 @@ export default function ExplorePage() {
             ))}
         </div>
 
-        {loading && <p className="py-8 text-center text-gray-500">Memuat...</p>}
+        {(selectedNews || selectedTrend) && (
+            <div className="mb-6 rounded-2xl border border-gray-200 bg-white/80 p-5">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSelectedNews(null);
+                        setSelectedTrend(null);
+                    }}
+                    className="mb-4 text-sm font-semibold text-[#b85c7a] hover:underline"
+                >
+                    ← Kembali ke Explore
+                </button>
 
+                {selectedNews && (
+                    <>
+                        <p className="mb-2 text-sm text-gray-500">
+                            {selectedNews.category} · {timeAgo(selectedNews.createdAt)}
+                        </p>
+                        <h2 className="text-xl font-bold text-slate-900">
+                            {selectedNews.title}
+                        </h2>
+                        <p className="mt-3 text-base text-gray-600">
+                            {selectedNews.summary}
+                        </p>
+                        <p className="mt-4 text-sm text-gray-500">
+                            {formatCount(selectedNews.postCount)}
+                        </p>
+                    </>
+                )}
+                {selectedTrend && (
+                    <>
+                        <p className="mb-2 text-sm text-gray-500">
+                            {selectedTrend.category} · Trending di Indonesia
+                        </p>
+                        <h2 className="text-xl font-bold text-slate-900">
+                            {selectedTrend.name}
+                        </h2>
+                        <p className="mt-3 text-sm text-gray-500">
+                            {formatCount(selectedTrend.postCount)}
+                        </p>
+                    </>
+                )}
+            </div>
+        )}
+        {loading && <p className="py-8 text-center text-gray-500">Memuat...</p>}
         {!loading && (
             <>
             {shownNews.length > 0 &&
@@ -444,7 +475,6 @@ export default function ExplorePage() {
                     ))}
                 </ul>
                 )}
-
             {shownTrending.length > 0 &&
                 section(
                 "Trending",
@@ -468,7 +498,6 @@ export default function ExplorePage() {
                     ))}
                 </ol>
                 )}
-
             {showAccounts &&
                 section(
                 "Akun untuk diikuti",
@@ -510,7 +539,6 @@ export default function ExplorePage() {
                     ))}
                 </ul>
                 )}
-
             {shownPosts.length > 0 &&
                 section(
                 "Postingan populer",
@@ -550,7 +578,6 @@ export default function ExplorePage() {
                                 >
                                     💬 {p._count.comments}
                                 </button>
-
                                 <button
                                     type="button"
                                     onClick={() => handleLikePost(p.id)}
@@ -559,10 +586,8 @@ export default function ExplorePage() {
                                 >
                                     {likeLoading[p.id] ? "Memproses..." : `♡ ${p._count.likes}`}
                                 </button>
-
                                 <span>📊 {p.views}</span>
                             </div>
-
                             {commentOpen[p.id] && (
                                 <div className="mt-3 space-y-3">
                                     <form
@@ -585,7 +610,6 @@ export default function ExplorePage() {
                                             disabled={!!commentLoading[p.id]}
                                             className="w-full resize-none rounded-xl border border-gray-200 bg-white/80 p-3 text-sm outline-none focus:border-[#b85c7a] focus:ring-2 focus:ring-pink-100"
                                         />
-
                                         <div className="flex justify-end">
                                             <button
                                                 type="submit"
@@ -599,7 +623,6 @@ export default function ExplorePage() {
                                             </button>
                                         </div>
                                     </form>
-
                                     {(newComments[p.id] ?? []).map((comment) => (
                                         <div
                                             key={comment.id}
@@ -615,7 +638,6 @@ export default function ExplorePage() {
                     ))}
                 </ul>
                 )}
-
             {nothing && (
                 <p className="py-8 text-center text-gray-500">
                 {searching ? `Tidak ada hasil untuk "${query.trim()}".` : "Belum ada konten."}
