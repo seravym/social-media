@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import "../../home/home.css";
 
 
@@ -68,6 +67,14 @@ function PostDetailContent() {
 
     loadPostDetail();
   }, [postId]);
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/home");
+    }
+  };
 
   const handleToggleLike = async () => {
     if (!post) return;
@@ -165,11 +172,15 @@ function PostDetailContent() {
   if (loading) return <div className="feed-layout"><p className="status-text">Memuat detail postingan...</p></div>;
   if (errorMsg || !post) {
     return (
-      <div className="feed-layout">
-        <p className="error-text">{errorMsg || "Postingan tidak ditemukan"}</p>
-        <div style={{ padding: "16px" }}>
-          <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
-        </div>
+      <div style={{ padding: "16px" }}>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="feed-nav-link"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          ← Kembali
+        </button>
       </div>
     );
   }
@@ -177,7 +188,14 @@ function PostDetailContent() {
   return (
     <div className="feed-layout">
       <nav className="feed-nav">
-        <Link href="/home" className="feed-nav-link">← Kembali ke Home</Link>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="feed-nav-link"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          ← Back
+        </button>
       </nav>
 
       <article className="post-detail-card">
