@@ -24,6 +24,10 @@ export function VibeNotesBar({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(myNote);
 
+  const directConversations = conversations.filter(
+    (chat) => chat.type !== "group" && chat.other !== null,
+  );
+
   const handleSaveNote = () => {
     const trimmed = draft.trim();
     if (trimmed) {
@@ -56,7 +60,7 @@ export function VibeNotesBar({
           </button>
         </div>
 
-        {conversations.slice(0, 8).map((chat, index) => {
+        {directConversations.slice(0, 8).map((chat, index) => {
           const name = chat.nickname || chat.other?.displayName || "User";
           const noteText = DEFAULT_NOTES[index % DEFAULT_NOTES.length];
           return (

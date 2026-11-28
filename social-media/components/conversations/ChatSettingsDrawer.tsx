@@ -36,6 +36,30 @@ const CHAT_THEMES = [
   { id: "mint", label: "Sage", swatch: "bg-[#6f9a83]" },
 ];
 
+function parseBackgroundValue(raw: string | null) {
+  if (!raw) return { bubble: "", image: "" };
+  if (raw === "pink") return { bubble: "rose", image: "" };
+  if (raw.includes("|")) {
+    const [bubble, ...rest] = raw.split("|");
+    return {
+      bubble: bubble === "pink" ? "rose" : bubble,
+      image: rest.join("|"),
+    };
+  }
+  const isImg =
+    raw.startsWith("http://") ||
+    raw.startsWith("https://") ||
+    raw.startsWith("data:image/");
+  return isImg ? { bubble: "", image: raw } : { bubble: raw, image: "" };
+}
+
+function serializeBackgroundValue(bubble: string, image: string) {
+  const b = bubble.trim();
+  const img = image.trim();
+  if (b && img) return `${b}|${img}`;
+  return img || b || null;
+}
+
 export function ChatSettingsDrawer({
   mode,
   isSelfNotes,
@@ -52,9 +76,10 @@ export function ChatSettingsDrawer({
   onDeleteConversation,
   onClose,
 }: ChatSettingsDrawerProps) {
-  const initialBg = background === "pink" ? "rose" : (background ?? "");
+  const parsed = parseBackgroundValue(background);
   const [nicknameInput, setNicknameInput] = useState(nickname ?? "");
-  const [selectedBg, setSelectedBg] = useState(initialBg);
+  const [selectedBubble, setSelectedBubble] = useState(parsed.bubble);
+  const [customBgImage, setCustomBgImage] = useState(parsed.image);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -67,14 +92,18 @@ export function ChatSettingsDrawer({
     (m) => Boolean(m.imageUrl) && !m.deletedAt,
   );
   const isCustomBg =
-    selectedBg.startsWith("http://") ||
-    selectedBg.startsWith("https://") ||
-    selectedBg.startsWith("data:image/");
+    customBgImage.startsWith("http://") ||
+    customBgImage.startsWith("https://") ||
+    customBgImage.startsWith("data:image/");
 
-  const emitPreview = (nextNick: string, nextBg: string) => {
+  const emitPreview = (
+    nextNick: string,
+    nextBubble: string,
+    nextImg: string,
+  ) => {
     onPreviewChange?.({
       nickname: nextNick.trim() || null,
-      background: nextBg.trim() || null,
+      background: serializeBackgroundValue(nextBubble, nextImg),
     });
   };
 
@@ -90,9 +119,9 @@ export function ChatSettingsDrawer({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setSelectedBg(reader.result);
+        setCustomBgImage(reader.result);
         setError(null);
-        emitPreview(nicknameInput, reader.result);
+        emitPreview(nicknameInput, selectedBubble, reader.result);
       }
     };
     reader.readAsDataURL(file);
@@ -105,7 +134,10 @@ export function ChatSettingsDrawer({
     setError(null);
 
     const nextNickname = nicknameInput.trim() || null;
-    const nextBackground = selectedBg.trim() || null;
+    const nextBackground = serializeBackgroundValue(
+      selectedBubble,
+      customBgImage,
+    );
 
     try {
       const res = await fetch(`/api/conversations/${conversationId}`, {
@@ -172,14 +204,14 @@ export function ChatSettingsDrawer({
         </div>
 
         {!isSelfNotes && (
-          <div className="flex gap-1.5 border-b border-white/75 px-4 py-2.5">
+          <div className="flex gap-4 border-b border-white/75 px-4 pt-2.5">
             <button
               type="button"
               onClick={() => onChangeMode("settings")}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition ${
+              className={`border-b-2 pb-2 text-xs font-medium transition ${
                 mode === "settings"
-                  ? "bg-slate-900 text-white"
-                  : "glass-chip text-slate-600 hover:bg-white/85"
+                  ? "border-[#b85c7a] font-semibold text-[#b85c7a]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
               Pengaturan
@@ -187,10 +219,10 @@ export function ChatSettingsDrawer({
             <button
               type="button"
               onClick={() => onChangeMode("media")}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition ${
+              className={`border-b-2 pb-2 text-xs font-medium transition ${
                 mode === "media"
-                  ? "bg-slate-900 text-white"
-                  : "glass-chip text-slate-600 hover:bg-white/85"
+                  ? "border-[#b85c7a] font-semibold text-[#b85c7a]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
               Media ({sharedImages.length})
@@ -200,8 +232,8 @@ export function ChatSettingsDrawer({
 
         <div className="flex-1 overflow-y-auto p-4">
           {mode === "settings" && !isSelfNotes ? (
-            <div className="space-y-5">
-              <div>
+            <div className="divide-y divide-white/75">
+              <div className="pb-4">
                 <label className="mb-1.5 block text-xs font-medium text-slate-700">
                   Nama Panggilan
                 </label>
@@ -211,21 +243,21 @@ export function ChatSettingsDrawer({
                   onChange={(e) => {
                     const value = e.target.value;
                     setNicknameInput(value);
-                    emitPreview(value, selectedBg);
+                    emitPreview(value, selectedBubble, customBgImage);
                   }}
                   placeholder={displayName}
                   maxLength={32}
-                  className="w-full rounded-xl border border-white/85 bg-white/65 px-3 py-2 text-xs text-slate-800 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none transition focus:border-slate-300 focus:bg-white/90"
+                  className="w-full rounded-xl border border-white/85 bg-white/70 px-3 py-2 text-xs text-slate-800 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none transition focus:border-[#b85c7a]/60 focus:bg-white"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
                   Kosongkan untuk kembali ke nama asli.
                 </p>
               </div>
 
-              <div>
+              <div className="py-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-700">
-                    Tema & Warna Balon
+                    Warna Balon & Latar
                   </span>
                   <input
                     ref={bgFileRef}
@@ -237,31 +269,31 @@ export function ChatSettingsDrawer({
                   <button
                     type="button"
                     onClick={() => bgFileRef.current?.click()}
-                    className="text-[11px] font-medium text-slate-600 underline underline-offset-2 transition hover:text-slate-900"
+                    className="text-[11px] font-medium text-[#b85c7a] underline underline-offset-2 transition hover:text-[#9e4865]"
                   >
                     Gambar latar
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   {CHAT_THEMES.map((item) => {
-                    const active = selectedBg === item.id;
+                    const active = selectedBubble === item.id;
                     return (
                       <button
                         key={item.id || "default"}
                         type="button"
                         onClick={() => {
-                          setSelectedBg(item.id);
-                          emitPreview(nicknameInput, item.id);
+                          setSelectedBubble(item.id);
+                          emitPreview(nicknameInput, item.id, customBgImage);
                         }}
-                        className={`flex items-center gap-2 rounded-xl p-2 text-left text-xs transition ${
+                        className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition ${
                           active
-                            ? "border border-slate-900 bg-white/90 font-medium text-slate-900 shadow-xs"
-                            : "glass-chip text-slate-600 hover:bg-white/85"
+                            ? "bg-white font-semibold text-slate-900 ring-1 ring-[#b85c7a]"
+                            : "bg-white/55 text-slate-600 hover:bg-white/85"
                         }`}
                       >
                         <span
-                          className={`h-4 w-4 shrink-0 rounded-full ${item.swatch}`}
+                          className={`h-3.5 w-3.5 shrink-0 rounded-full ${item.swatch}`}
                         />
                         <span className="truncate">{item.label}</span>
                       </button>
@@ -270,15 +302,15 @@ export function ChatSettingsDrawer({
                 </div>
 
                 {isCustomBg && (
-                  <div className="glass-chip mt-2.5 flex items-center justify-between rounded-xl p-2">
+                  <div className="mt-2.5 flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-2">
                     <div className="flex items-center gap-2">
                       <Image
-                        src={selectedBg}
+                        src={customBgImage}
                         alt="Latar pilihan"
-                        width={36}
-                        height={36}
+                        width={32}
+                        height={32}
                         unoptimized
-                        className="h-9 w-9 rounded-lg object-cover"
+                        className="h-8 w-8 rounded-md object-cover"
                       />
                       <span className="text-xs font-medium text-slate-700">
                         Latar kustom
@@ -287,10 +319,10 @@ export function ChatSettingsDrawer({
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedBg("");
-                        emitPreview(nicknameInput, "");
+                        setCustomBgImage("");
+                        emitPreview(nicknameInput, selectedBubble, "");
                       }}
-                      className="rounded-md px-2 py-1 text-[11px] text-slate-500 hover:bg-white/80 hover:text-slate-700"
+                      className="rounded-md px-2 py-1 text-[11px] text-slate-500 hover:bg-white hover:text-slate-700"
                     >
                       Hapus
                     </button>
@@ -298,7 +330,7 @@ export function ChatSettingsDrawer({
                 )}
               </div>
 
-              <div className="glass-chip flex items-center justify-between rounded-xl p-3">
+              <div className="flex items-center justify-between py-4">
                 <div className="pr-3">
                   <p className="text-xs font-medium text-slate-800">
                     Mode Menghilang
@@ -313,7 +345,7 @@ export function ChatSettingsDrawer({
                   aria-checked={vanishMode}
                   onClick={() => onToggleVanish(!vanishMode)}
                   className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                    vanishMode ? "bg-slate-900" : "bg-slate-300"
+                    vanishMode ? "bg-[#b85c7a]" : "bg-slate-300"
                   }`}
                 >
                   <span
@@ -324,7 +356,7 @@ export function ChatSettingsDrawer({
                 </button>
               </div>
 
-              <div className="rounded-xl border border-[#b85c7a]/25 bg-[#faf0f3]/70 p-3">
+              <div className="pt-4">
                 <p className="text-xs font-medium text-slate-800">
                   Hapus Percakapan
                 </p>
@@ -339,12 +371,12 @@ export function ChatSettingsDrawer({
                       setConfirmDelete(true);
                       setDeleteError(null);
                     }}
-                    className="mt-2 rounded-lg border border-[#b85c7a]/40 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[#9e4865] transition hover:bg-white"
+                    className="mt-2.5 text-xs font-semibold text-[#9e4865] underline underline-offset-2 transition hover:text-[#b85c7a]"
                   >
                     Hapus Percakapan
                   </button>
                 ) : (
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2.5 space-y-2">
                     <p className="text-[11px] font-medium text-[#9e4865]">
                       Yakin ingin menghapus percakapan ini?
                     </p>
@@ -377,7 +409,7 @@ export function ChatSettingsDrawer({
               </div>
 
               {error && (
-                <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
                   {error}
                 </p>
               )}
@@ -430,7 +462,7 @@ export function ChatSettingsDrawer({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="w-full rounded-xl bg-slate-900 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl bg-[#b85c7a] py-2.5 text-xs font-semibold text-white transition hover:bg-[#9e4865] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Menyimpan..." : "Simpan Pengaturan"}
             </button>

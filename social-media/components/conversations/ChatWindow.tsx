@@ -98,12 +98,18 @@ interface ChatWindowProps {
   initialDraft?: string;
   onClearInitialDraft?: () => void;
   onBack: () => void;
-  onSendMessage: (body: string, imageUrl: string | null) => Promise<void>;
+  onSendMessage: (
+    body: string,
+    imageUrl: string | null,
+    replyToId?: string | null,
+  ) => Promise<void>;
   onLoadMore: () => void;
   onRetryLoad: () => void;
   onRetrySend: () => void;
   onEditMessage: (messageId: string, body: string) => Promise<boolean>;
   onDeleteMessage: (messageId: string) => Promise<boolean>;
+  onReactMessage: (messageId: string, emoji: string) => Promise<void>;
+  onPinMessage: (messageId: string) => Promise<void>;
   onForwardMessage: (
     conversationId: string,
     message: ChatMessageDto,
@@ -138,6 +144,8 @@ export function ChatWindow({
   onRetrySend,
   onEditMessage,
   onDeleteMessage,
+  onReactMessage,
+  onPinMessage,
   onForwardMessage,
   onOpenMedia,
   onOpenSettings,
@@ -146,12 +154,8 @@ export function ChatWindow({
   const [prevInitialDraft, setPrevInitialDraft] = useState(initialDraft);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showStickers, setShowStickers] = useState(false);
-  const [reactions, setReactions] = useState<Record<string, string>>({});
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
-  const [replyMap, setReplyMap] = useState<Record<string, ReplyTarget>>({});
-  const [pinnedMessage, setPinnedMessage] = useState<ChatMessageDto | null>(
-    null,
-  );
+  const pinnedMessage = messages.find((m) => m.pinnedAt) ?? null;
   const [forwardTarget, setForwardTarget] = useState<ChatMessageDto | null>(
     null,
   );
@@ -236,10 +240,7 @@ export function ChatWindow({
   };
 
   const handleReact = (messageId: string, emoji: string) => {
-    setReactions((prev) => ({
-      ...prev,
-      [messageId]: prev[messageId] === emoji ? "" : emoji,
-    }));
+    void onReactMessage(messageId, emoji);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,12 +274,7 @@ export function ChatWindow({
       onClearInitialDraft();
     }
 
-    if (currentReply) {
-      const tempKey = `${Date.now()}`;
-      setReplyMap((prev) => ({ ...prev, [tempKey]: currentReply }));
-    }
-
-    void onSendMessage(trimmed, currentImage);
+    void onSendMessage(trimmed, currentImage, currentReply?.id ?? null);
   };
 
   const handleSendSticker = (stickerText: string) => {
@@ -299,20 +295,29 @@ export function ChatWindow({
     }
   };
 
-  const normalizedBg = background === "pink" ? "rose" : background;
+  const rawBg = background ?? "";
+  const [rawTheme, ...restBg] = rawBg.includes("|")
+    ? rawBg.split("|")
+    : rawBg.startsWith("http://") ||
+        rawBg.startsWith("https://") ||
+        rawBg.startsWith("data:image/")
+      ? ["", rawBg]
+      : [rawBg];
+
+  const normalizedBg = rawTheme === "pink" ? "rose" : rawTheme;
   const theme =
     (normalizedBg && CHAT_THEMES[normalizedBg]) || CHAT_THEMES.default;
+  const customImageUrl = restBg.join("|");
   const isCustomImageBg =
-    background &&
-    (background.startsWith("http://") ||
-      background.startsWith("https://") ||
-      background.startsWith("data:image/"));
+    customImageUrl.startsWith("http://") ||
+    customImageUrl.startsWith("https://") ||
+    customImageUrl.startsWith("data:image/");
 
   const containerStyle = vanishMode
     ? undefined
     : isCustomImageBg
       ? {
-          backgroundImage: `url(${background})`,
+          backgroundImage: `url(${customImageUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }
@@ -335,7 +340,9 @@ export function ChatWindow({
         vanishMode={vanishMode}
         pinnedMessage={pinnedMessage}
         onBack={onBack}
-        onUnpin={() => setPinnedMessage(null)}
+        onUnpin={() => {
+          if (pinnedMessage) void onPinMessage(pinnedMessage.id);
+        }}
         onOpenMedia={onOpenMedia}
         onOpenSettings={onOpenSettings}
       />
@@ -425,9 +432,13 @@ export function ChatWindow({
                     isMine={isSelfNotes || msg.senderId === currentUserId}
                     senderName={isGroup ? senderMap?.[msg.senderId] : undefined}
                     bubbleClass={activeBubbleClass}
-                    reaction={reactions[msg.id]}
-                    replyTo={replyMap[msg.id]}
-                    isPinned={pinnedMessage?.id === msg.id}
+                    reactions={msg.reactions}
+                    replyTo={
+                      msg.replyTo
+                        ? { id: msg.replyTo.id, body: msg.replyTo.body }
+                        : undefined
+                    }
+                    isPinned={Boolean(msg.pinnedAt)}
                     vanishMode={vanishMode}
                     menuOpen={openMenuId === msg.id}
                     onToggleMenu={() =>
@@ -436,9 +447,9 @@ export function ChatWindow({
                     onCloseMenu={() => setOpenMenuId(null)}
                     onReact={handleReact}
                     onReply={(m) => setReplyTarget({ id: m.id, body: m.body })}
-                    onPin={(m) =>
-                      setPinnedMessage((prev) => (prev?.id === m.id ? null : m))
-                    }
+                    onPin={(m) => {
+                      void onPinMessage(m.id);
+                    }}
                     onEditMessage={onEditMessage}
                     onDeleteMessage={onDeleteMessage}
                     onForward={(m) => {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { ChatMessageDto } from "@/lib/types";
+import type { ChatMessageDto, ChatReactionDto } from "@/lib/types";
 import {
   PostShareCard,
   type SharedPostData,
@@ -20,7 +20,7 @@ interface MessageBubbleProps {
   isMine: boolean;
   senderName?: string;
   bubbleClass?: string;
-  reaction?: string;
+  reactions?: ChatReactionDto[];
   replyTo?: ReplyTarget;
   isPinned?: boolean;
   vanishMode?: boolean;
@@ -60,7 +60,7 @@ export function MessageBubble({
   isMine,
   senderName,
   bubbleClass = "bg-slate-900 text-white",
-  reaction,
+  reactions = [],
   replyTo,
   isPinned = false,
   vanishMode = false,
@@ -268,9 +268,14 @@ export function MessageBubble({
             <span>{timeText}</span>
           </div>
 
-          {reaction && !isDeleted && (
-            <span className="absolute -bottom-2.5 right-2 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-xs shadow-2xs">
-              {reaction}
+          {reactions.length > 0 && !isDeleted && (
+            <span className="absolute -bottom-2.5 right-2 flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-xs shadow-2xs">
+              {reactions.map((item) => (
+                <span key={item.emoji} className={item.mine ? "font-semibold" : undefined}>
+                  {item.emoji}
+                  {item.count > 1 ? ` ${item.count}` : ""}
+                </span>
+              ))}
             </span>
           )}
         </div>
