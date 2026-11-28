@@ -122,6 +122,29 @@ export default function HomePage() {
     }
   };
 
+  const handleToggleBookmark = async (e: React.MouseEvent, postId: string) => {
+  e.stopPropagation();
+  try {
+    const res = await fetch(`/api/posts/${postId}/bookmark`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Gagal memproses bookmark");
+      return;
+    }
+
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId ? { ...post, isBookmarked: data.bookmarked } : post
+      )
+    );
+  } catch {
+    alert("Terjadi kesalahan saat memproses bookmark");
+  }
+};
+
   return (
     <div className="feed-layout">
 
@@ -202,6 +225,12 @@ export default function HomePage() {
                     {post.isLiked ? "❤️" : "🤍"} {post.likesCount}
                   </button>
                   <span>📊 {post.views}</span>
+                  <button
+                    className={`action-btn ${post.isBookmarked ? "liked" : ""}`}
+                    onClick={(e) => handleToggleBookmark(e, post.id)}
+                  >
+                    {post.isBookmarked ? "🔖 Saved" : "🔖 Save"}
+                  </button>
                 </div>
               </div>
             ))
