@@ -28,7 +28,7 @@ export const GET = authed(async (me, req) => {
             orderBy: { postCount: "desc" },
         }),
 
-        prisma.explorePost.findMany({
+        prisma.post.findMany({
             where: { AND: textFilter(["content"]) },
             include: {
                 author: {
@@ -36,6 +36,12 @@ export const GET = authed(async (me, req) => {
                         id: true,
                         name: true,
                         username: true,
+                    },
+                },
+                _count: {
+                    select: {
+                        comments: true,
+                        likes: true,
                     },
                 },
             },
