@@ -156,6 +156,39 @@ export default function ProfilePage() {
     </div>
 </div>
 
+    <div className = "edit-modal-profile">
+        <div className= "edit-avatar">
+            <div className = "edit-avt-circle">
+                <img src="/juhoon.jpg" alt= "ma Profil" />
+            </div>
+            <button type = "button" className="edit-plus-avt">
+                ⊹
+            </button>
+        </div>
+
+        <div className = "edit-form-col">
+            <label className = "edit-label">Nama Akun</label>
+            <input type = "text" className="edit-input"/>
+            <label className = "edit-label">Nama Akun</label>
+            <input type = "text" className="edit-input"/>
+            <label className = "edit-label">Nama Akun</label>
+            <textarea
+            maxLength={35}
+            placeholder = "Maksimal 35 huruf"
+            className = "edit-textarea"
+            />
+            <span className="edit-bio-counter"> 0/35</span>
+            <button
+            type = "button"
+            className = "edit-save-btn"
+            onClick={() => setIsEditOpen(false)}
+            >
+                ✿ Save ✿
+            </button>
+        </div>
+
+    </div>
+
     </div>
   );
 }
